@@ -69,7 +69,10 @@ import app.hideandseek.core.HideAndSeekContent
 import app.hideandseek.core.SpotDef
 import app.hideandseek.core.TextTemplate
 import kotlinx.coroutines.delay
+import kotlin.math.PI
+import kotlin.math.abs
 import kotlin.math.cos
+import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -78,6 +81,12 @@ import kotlin.random.Random
 
 private val CardInk = Color(0xFF1F2430)
 private val CardInkSoft = Color(0xFF5B6475)
+
+// Выход лисы после находки: «ой, нашли!» → два прыжка → убегает за край экрана.
+private const val FOX_FOUND_MS = 420
+private const val FOX_JUMP_MS = 600
+private const val FOX_RUN_MS = 600
+private const val FOX_TOTAL_MS = FOX_FOUND_MS + 2 * FOX_JUMP_MS + FOX_RUN_MS
 
 /**
  * The layer above the app. It has no touch handling of its own: only the small
@@ -93,6 +102,8 @@ internal fun HideAndSeekOverlay(controller: HideAndSeekController, modifier: Mod
     val blocked = controller.registry.isBlocked
     // Starts loading today's sprite (if the content has one) before the creature shows up.
     val sprite = rememberSprite(plan?.creature?.imageUrl)
+    // Позы лисы грузятся заранее; пока грузятся, зверёк не выглядывает.
+    val poses = rememberPoses(plan?.creature?.sprites)
 
     LaunchedEffect(blocked) {
         if (blocked) celebration = null // never cover payment screens, not even with the "found" card
@@ -101,7 +112,7 @@ internal fun HideAndSeekOverlay(controller: HideAndSeekController, modifier: Mod
     Box(modifier.onGloballyPositioned { frame.update(it.positionInRoot(), it.size) }) {
         if (content != null && plan != null && !controller.progress.isFound(plan.day)) {
             key(plan.day, plan.spot.id, plan.creature.id) {
-                PeekingCreature(controller, content, plan, frame, sprite) { celebration = it }
+                PeekingCreature(controller, content, plan, frame, sprite, poses) { celebration = it }
             }
         }
         val current = celebration
@@ -138,6 +149,7 @@ private fun PeekingCreature(
     plan: DailyPlan,
     frame: OverlayFrame,
     sprite: ImageBitmap?,
+    poses: PosesState,
     onFound: (Celebration) -> Unit,
 ) {
     val registry = controller.registry
@@ -146,22 +158,32 @@ private fun PeekingCreature(
     val density = LocalDensity.current
     val haptics = LocalHapticFeedback.current
     val sizePx = with(density) { look.sizeDp.dp.toPx() }
+    val loaded = poses.sprites
+    // Поза лисы для этого края (сверху — peek, сбоку — side). Нет позы — прежний зверёк: картинка или рисунок кодом.
+    val pose = loaded?.forEdge(spot.edge)
+    val poseSize = pose?.size(density)
+    val shape = if (pose != null && poseSize != null) {
+        poseShape(spot.edge, poseSize, pose.anchorX, pose.anchorY)
+    } else {
+        HideShape(sizePx / 2f, sizePx / 2f, sizePx * look.peek, 0f)
+    }
+    // Насколько выглядывать: поза — целиком (1), нарисованный зверёк — на look.peek своей высоты.
+    val full = if (pose != null) 1f else look.peek
     // The tap target covers only the visible part of the creature (outside the element), at least 48dp.
-    val hitAlongPx = with(density) { max(look.sizeDp.toFloat(), 48f).dp.toPx() }
-    val hitDepthPx = with(density) { max(look.sizeDp * look.peek + 6f, 48f).dp.toPx() }
+    val hit = with(density) { hitBox(Offset.Zero, spot.edge, shape, shape.out + 6.dp.toPx(), 48.dp.toPx()) }
     val last = remember { LastAnchor() }
 
     // The point on the element's edge the creature peeks from, in overlay pixels.
     val anchor: () -> Offset? = {
-        registry.find(spot.id)?.let { anchorPoint(it.bounds, spot, sizePx) - frame.origin }
+        registry.find(spot.id)?.let { anchorPoint(it.bounds, spot, shape) - frame.origin }
             ?.also { last.value = it }
     }
 
-    val eligible by remember(spot.id, sizePx) {
+    val eligible by remember(spot.id, shape, poses.loading) {
         derivedStateOf {
             val geometry = registry.find(spot.id)
-            geometry != null && !registry.isBlocked && controller.isAwakeHour &&
-                isPeekVisible(geometry, spot, sizePx, look.peek, frame.origin, frame.size)
+            !poses.loading && geometry != null && !registry.isBlocked && controller.isAwakeHour &&
+                isPeekVisible(geometry, spot, shape, frame.origin, frame.size)
         }
     }
 
@@ -171,13 +193,13 @@ private fun PeekingCreature(
         if (eligible) {
             delay(if (appearedOnce) 300L else look.appearDelayMs)
             appearedOnce = true
-            peek.animateTo(look.peek, spring(dampingRatio = 0.45f, stiffness = 220f))
+            peek.animateTo(full, spring(dampingRatio = 0.45f, stiffness = 220f))
             // Now and then duck and peek out again, so the creature feels alive.
             while (true) {
                 delay(7_000L)
-                peek.animateTo(look.peek * 0.3f, tween(durationMillis = 220))
+                peek.animateTo(full * 0.3f, tween(durationMillis = 220))
                 delay(900L)
-                peek.animateTo(look.peek, spring(dampingRatio = 0.45f, stiffness = 260f))
+                peek.animateTo(full, spring(dampingRatio = 0.45f, stiffness = 260f))
             }
         } else if (registry.find(spot.id) == null) {
             // Элемент ушёл с экрана (переключили вкладку): исчезаем сразу,
@@ -205,52 +227,72 @@ private fun PeekingCreature(
                 val a = anchor() ?: return@drawWithContent
                 val w = size.width
                 val h = size.height
+                // Лапы позы лежат на самом краю элемента: открываем их в конце выглядывания.
+                val paws = shape.inward * ((peek.value / full - 0.75f) / 0.25f).coerceIn(0f, 1f)
+                // Боковая поза, которая ниже элемента, обрезается по его нижнему краю.
+                val bottom = if (pose == null) h else registry.find(spot.id)?.let { it.bounds.bottom - frame.origin.y } ?: h
                 when (spot.edge) {
-                    Edge.TOP -> clipRect(0f, 0f, w, a.y) { this@drawWithContent.drawContent() }
-                    Edge.BOTTOM -> clipRect(0f, a.y, w, h) { this@drawWithContent.drawContent() }
-                    Edge.LEFT -> clipRect(0f, 0f, a.x, h) { this@drawWithContent.drawContent() }
-                    Edge.RIGHT -> clipRect(a.x, 0f, w, h) { this@drawWithContent.drawContent() }
+                    Edge.TOP -> clipRect(0f, 0f, w, a.y + paws) { this@drawWithContent.drawContent() }
+                    Edge.BOTTOM -> clipRect(0f, a.y - paws, w, h) { this@drawWithContent.drawContent() }
+                    Edge.LEFT -> clipRect(0f, 0f, a.x + paws, bottom) { this@drawWithContent.drawContent() }
+                    Edge.RIGHT -> clipRect(a.x - paws, 0f, w, bottom) { this@drawWithContent.drawContent() }
                 }
             },
     ) {
-        val creatureModifier = Modifier
-            .offset {
-                val a = anchor() ?: last.value ?: Offset.Zero
-                IntOffset((a.x - sizePx / 2f).roundToInt(), (a.y - peek.value * sizePx).roundToInt())
-            }
-            .size(look.sizeDp.dp)
-            .graphicsLayer {
-                rotationZ = spot.edge.rotationDegrees + idle.wiggle.value
-                transformOrigin = TransformOrigin(0.5f, peek.value)
-            }
-        if (sprite != null) {
-            Image(bitmap = sprite, contentDescription = null, modifier = creatureModifier)
-        } else {
-            Canvas(creatureModifier) {
-                drawCreature(
-                    s = size.width,
-                    body = color,
-                    eyeOpen = idle.blink.value,
-                    lookX = idle.look.value,
-                    pawLine = peek.value,
-                    sparkle = if (rare) idle.sparkle.value else -1f,
+        if (pose != null && poseSize != null) {
+            Canvas(Modifier.fillMaxSize()) {
+                val a = anchor() ?: last.value ?: return@Canvas
+                drawHidingPose(
+                    pose = pose,
+                    size = poseSize,
+                    edge = spot.edge,
+                    anchor = a,
+                    progress = peek.value / full,
+                    out = shape.out,
+                    blink = idle.blink.value,
+                    wiggle = idle.wiggle.value,
                 )
+                if (rare) {
+                    val center = a + spot.edge.outward() * (shape.out * 0.5f)
+                    drawTwinkles(center, max(shape.before, shape.after) * 0.9f, idle.sparkle.value)
+                }
+            }
+        } else {
+            val creatureModifier = Modifier
+                .offset {
+                    val a = anchor() ?: last.value ?: Offset.Zero
+                    IntOffset((a.x - sizePx / 2f).roundToInt(), (a.y - peek.value * sizePx).roundToInt())
+                }
+                .size(look.sizeDp.dp)
+                .graphicsLayer {
+                    rotationZ = spot.edge.rotationDegrees + idle.wiggle.value
+                    transformOrigin = TransformOrigin(0.5f, peek.value)
+                }
+            if (sprite != null) {
+                Image(bitmap = sprite, contentDescription = null, modifier = creatureModifier)
+            } else {
+                Canvas(creatureModifier) {
+                    drawCreature(
+                        s = size.width,
+                        body = color,
+                        eyeOpen = idle.blink.value,
+                        lookX = idle.look.value,
+                        pawLine = peek.value,
+                        sparkle = if (rare) idle.sparkle.value else -1f,
+                    )
+                }
             }
         }
     }
 
     // Tap target over the visible part only, so the element underneath stays fully usable.
-    val alongEdge = spot.edge == Edge.TOP || spot.edge == Edge.BOTTOM
-    val hitWidth = with(density) { (if (alongEdge) hitAlongPx else hitDepthPx).toDp() }
-    val hitHeight = with(density) { (if (alongEdge) hitDepthPx else hitAlongPx).toDp() }
     Box(
         Modifier
             .offset {
                 val a = anchor() ?: last.value ?: Offset.Zero
-                val box = peekBox(a, spot.edge, hitAlongPx, hitDepthPx)
-                IntOffset(box.left.roundToInt(), box.top.roundToInt())
+                IntOffset((a.x + hit.left).roundToInt(), (a.y + hit.top).roundToInt())
             }
-            .size(hitWidth, hitHeight)
+            .size(with(density) { hit.width.toDp() }, with(density) { hit.height.toDp() })
             .semantics { contentDescription = content.texts.accessibilityLabel }
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
@@ -260,20 +302,44 @@ private fun PeekingCreature(
                 val a = last.value ?: return@clickable
                 haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                 controller.markFound(plan)
-                onFound(celebrationFor(controller, content, plan, a, sizePx, peek.value, sprite))
+                onFound(
+                    celebrationFor(
+                        controller, content, plan, a, sizePx, peek.value, sprite,
+                        poses = loaded,
+                        byPose = pose != null,
+                        shape = shape,
+                    ),
+                )
             },
     )
 }
 
 // ---- Geometry ----
 
+/**
+ * Как зверёк сидит на краю (в px): сколько занимает вдоль края до якоря ([before]: левее или выше)
+ * и после него ([after]), насколько торчит наружу ([out]) и насколько заходит на сам элемент ([inward], лапы).
+ */
+internal data class HideShape(val before: Float, val after: Float, val out: Float, val inward: Float)
+
+/** Форма позы-картинки с якорем ([anchorX], [anchorY]) в долях её размера. */
+internal fun poseShape(edge: Edge, size: Size, anchorX: Float, anchorY: Float): HideShape = when (edge) {
+    Edge.TOP -> HideShape(anchorX * size.width, (1f - anchorX) * size.width, anchorY * size.height, (1f - anchorY) * size.height)
+    Edge.BOTTOM -> HideShape(anchorX * size.width, (1f - anchorX) * size.width, (1f - anchorY) * size.height, anchorY * size.height)
+    // Боковая поза нарисована для правого края; для левого она зеркалится, размеры те же.
+    Edge.LEFT, Edge.RIGHT ->
+        HideShape(anchorY * size.height, (1f - anchorY) * size.height, (1f - anchorX) * size.width, anchorX * size.width)
+}
+
 /** The point on the element's edge where the creature sits, clamped so it fits on that edge. */
-internal fun anchorPoint(bounds: Rect, spot: SpotDef, sizePx: Float): Offset {
-    val half = sizePx / 2f
+internal fun anchorPoint(bounds: Rect, spot: SpotDef, shape: HideShape): Offset {
     fun along(start: Float, end: Float): Float {
-        val lo = start + half
-        val hi = end - half
-        return if (lo <= hi) lo + (hi - lo) * spot.align else (start + end) / 2f
+        val lo = start + shape.before
+        val hi = end - shape.after
+        if (lo <= hi) return lo + (hi - lo) * spot.align
+        // Зверёк длиннее края: ставим его по центру, но якорь не дальше четверти длины от концов края.
+        val quarter = (end - start) / 4f
+        return ((start + end) / 2f + (shape.before - shape.after) / 2f).coerceIn(start + quarter, end - quarter)
     }
     return when (spot.edge) {
         Edge.TOP -> Offset(along(bounds.left, bounds.right), bounds.top)
@@ -283,30 +349,32 @@ internal fun anchorPoint(bounds: Rect, spot: SpotDef, sizePx: Float): Offset {
     }
 }
 
-/** The rectangle on the outer side of the edge: [along] wide and [depth] deep. */
-internal fun peekBox(anchor: Offset, edge: Edge, along: Float, depth: Float): Rect {
-    val h = along / 2f
-    return when (edge) {
-        Edge.TOP -> Rect(anchor.x - h, anchor.y - depth, anchor.x + h, anchor.y)
-        Edge.BOTTOM -> Rect(anchor.x - h, anchor.y, anchor.x + h, anchor.y + depth)
-        Edge.LEFT -> Rect(anchor.x - depth, anchor.y - h, anchor.x, anchor.y + h)
-        Edge.RIGHT -> Rect(anchor.x, anchor.y - h, anchor.x + depth, anchor.y + h)
-    }
+/** The rectangle on the outer side of the edge: [before] + [after] along it and [depth] deep. */
+internal fun peekBox(anchor: Offset, edge: Edge, before: Float, after: Float, depth: Float): Rect = when (edge) {
+    Edge.TOP -> Rect(anchor.x - before, anchor.y - depth, anchor.x + after, anchor.y)
+    Edge.BOTTOM -> Rect(anchor.x - before, anchor.y, anchor.x + after, anchor.y + depth)
+    Edge.LEFT -> Rect(anchor.x - depth, anchor.y - before, anchor.x, anchor.y + after)
+    Edge.RIGHT -> Rect(anchor.x, anchor.y - before, anchor.x + depth, anchor.y + after)
+}
+
+/** Зона тапа над видимой частью зверька, не меньше [minPx] по обеим сторонам (растёт наружу от края). */
+internal fun hitBox(anchor: Offset, edge: Edge, shape: HideShape, depth: Float, minPx: Float): Rect {
+    val extra = max(0f, minPx - (shape.before + shape.after)) / 2f
+    return peekBox(anchor, edge, shape.before + extra, shape.after + extra, max(depth, minPx))
 }
 
 /** True when the edge is on screen (not scrolled away) and the peeking creature fits in the overlay. */
 internal fun isPeekVisible(
     geometry: SpotGeometry,
     spot: SpotDef,
-    sizePx: Float,
-    peek: Float,
+    shape: HideShape,
     origin: Offset,
     overlaySize: IntSize,
 ): Boolean {
     if (geometry.visibleBounds.isEmpty || overlaySize.width <= 0 || overlaySize.height <= 0) return false
-    val point = anchorPoint(geometry.bounds, spot, sizePx) // root coordinates
+    val point = anchorPoint(geometry.bounds, spot, shape) // root coordinates
     if (!geometry.visibleBounds.inflate(1f).contains(point)) return false
-    val box = peekBox(point, spot.edge, sizePx, sizePx * peek)
+    val box = peekBox(point, spot.edge, shape.before, shape.after, shape.out)
     val overlay = Rect(origin, Size(overlaySize.width.toFloat(), overlaySize.height.toFloat())).inflate(1f)
     return box.left >= overlay.left && box.top >= overlay.top &&
         box.right <= overlay.right && box.bottom <= overlay.bottom
@@ -329,6 +397,12 @@ internal class Celebration(
     val sizePx: Float,
     val startPeek: Float,
     val sprite: ImageBitmap?,
+    /** Позы для выхода лисы; null — прежний прыжок нарисованного зверька. */
+    val poses: LoadedSprites?,
+    /** Как зверёк сидел на краю (откуда выпрыгивает лиса). */
+    val shape: HideShape,
+    /** Картинка в карточке «Нашёл!». */
+    val cardImage: ImageBitmap?,
     val title: String,
     val body: String,
     val streakLine: String?,
@@ -345,6 +419,9 @@ private fun celebrationFor(
     sizePx: Float,
     peekNow: Float,
     sprite: ImageBitmap?,
+    poses: LoadedSprites?,
+    byPose: Boolean,
+    shape: HideShape,
 ): Celebration {
     val progress = controller.progress
     val values = mapOf(
@@ -362,6 +439,10 @@ private fun celebrationFor(
         sizePx = sizePx,
         startPeek = peekNow,
         sprite = sprite,
+        // Лиса выпрыгивает позами, только если и пряталась позой (а не прежним рисунком).
+        poses = poses?.takeIf { byPose && it.hasCelebration },
+        shape = shape,
+        cardImage = poses?.celebrate?.image ?: poses?.found?.image ?: sprite,
         title = TextTemplate.fill(texts.foundTitle, values),
         body = TextTemplate.fill(texts.foundBody, values),
         streakLine = if (progress.streak >= 2) TextTemplate.fill(texts.streak, values) else null,
@@ -406,12 +487,16 @@ private fun makeParticles(seed: Long, edge: Edge, base: Color, rare: Boolean): L
 @Composable
 private fun CelebrationLayer(c: Celebration, onFinished: () -> Unit) {
     val burst = remember { Animatable(0f) }
+    val fox = remember { Animatable(if (c.poses != null) 0f else 1f) }
     val card = remember { Animatable(0f) }
     var cardVisible by remember { mutableStateOf(true) }
     val particles = remember(c.id) { makeParticles(c.id, c.edge, Color(c.creature.color), c.creature.rare) }
 
     LaunchedEffect(Unit) {
         burst.animateTo(1f, tween(durationMillis = 1300, easing = LinearEasing))
+    }
+    LaunchedEffect(Unit) {
+        fox.animateTo(1f, tween(durationMillis = FOX_TOTAL_MS, easing = LinearEasing))
     }
     LaunchedEffect(cardVisible) {
         if (cardVisible) {
@@ -420,14 +505,14 @@ private fun CelebrationLayer(c: Celebration, onFinished: () -> Unit) {
             cardVisible = false
         } else {
             card.animateTo(0f, tween(durationMillis = 220))
-            while (burst.value < 1f) delay(50L)
+            while (burst.value < 1f || fox.value < 1f) delay(50L)
             onFinished()
         }
     }
 
     // Pure drawing, no touch handling.
     Canvas(Modifier.fillMaxSize()) {
-        drawCelebration(c, particles, burst.value)
+        drawCelebration(c, particles, burst.value, fox.value)
     }
 
     val cardShown by remember { derivedStateOf { card.value > 0.01f } }
@@ -438,34 +523,43 @@ private fun CelebrationLayer(c: Celebration, onFinished: () -> Unit) {
     }
 }
 
-private fun DrawScope.drawCelebration(c: Celebration, particles: List<Particle>, t: Float) {
-    if (t >= 1f) return
+private fun DrawScope.drawCelebration(c: Celebration, particles: List<Particle>, t: Float, foxT: Float) {
     val s = c.sizePx
     val color = Color(c.creature.color)
-    val burstCenter = c.anchor + c.edge.outward() * (0.55f * s)
-    val eased = 1f - (1f - t) * (1f - t) * (1f - t) // ease-out cubic
+    val poses = c.poses
+    if (t < 1f) {
+        val burstCenter = c.anchor + c.edge.outward() * (if (poses != null) c.shape.out * 0.5f else 0.55f * s)
+        val eased = 1f - (1f - t) * (1f - t) * (1f - t) // ease-out cubic
 
-    // Ring
-    drawCircle(
-        color = color.copy(alpha = 0.55f * (1f - t)),
-        radius = s * (0.3f + 1.4f * eased),
-        center = burstCenter,
-        style = Stroke(width = s * 0.07f * (1f - t)),
-    )
+        // Ring
+        drawCircle(
+            color = color.copy(alpha = 0.55f * (1f - t)),
+            radius = s * (0.3f + 1.4f * eased),
+            center = burstCenter,
+            style = Stroke(width = s * 0.07f * (1f - t)),
+        )
 
-    // Confetti and stars
-    for (p in particles) {
-        val travel = p.speed * s * 1.7f * eased
-        val x = burstCenter.x + cos(p.angle) * travel
-        val y = burstCenter.y + sin(p.angle) * travel + 1.2f * s * t * t
-        val alpha = (1f - t * t).coerceIn(0f, 1f)
-        val r = p.radius * s * (1f - 0.35f * t)
-        if (p.star) {
-            drawPath(star(Offset(x, y), r * 1.7f, p.spin + 200f * t), p.color.copy(alpha = alpha))
-        } else {
-            drawCircle(p.color.copy(alpha = alpha), radius = r, center = Offset(x, y))
+        // Confetti and stars
+        for (p in particles) {
+            val travel = p.speed * s * 1.7f * eased
+            val x = burstCenter.x + cos(p.angle) * travel
+            val y = burstCenter.y + sin(p.angle) * travel + 1.2f * s * t * t
+            val alpha = (1f - t * t).coerceIn(0f, 1f)
+            val r = p.radius * s * (1f - 0.35f * t)
+            if (p.star) {
+                drawPath(star(Offset(x, y), r * 1.7f, p.spin + 200f * t), p.color.copy(alpha = alpha))
+            } else {
+                drawCircle(p.color.copy(alpha = alpha), radius = r, center = Offset(x, y))
+            }
         }
     }
+
+    // Лиса поверх звёздочек: «ой, нашли!», два прыжка, убегает.
+    if (poses != null) {
+        drawFoxCelebration(c, poses, foxT)
+        return
+    }
+    if (t >= 1f) return
 
     // The creature jumps out of its hiding place, then floats away and fades.
     val popT = (t / 0.3f).coerceIn(0f, 1f)
@@ -498,6 +592,88 @@ private fun DrawScope.drawCelebration(c: Celebration, particles: List<Particle>,
     }
 }
 
+/**
+ * Выход лисы после тапа, [t] от 0 до 1 за [FOX_TOTAL_MS]:
+ * поза found — «поп» 0,8 → 1,1 → 1,0 и маленький прыжок от края;
+ * celebrate — два прыжка с приземлением (сплющивание 0,9 по высоте);
+ * run — наклон 8° и рывок за ближайший край экрана с покачиванием.
+ * Если какой-то позы нет, её место занимает соседняя.
+ */
+private fun DrawScope.drawFoxCelebration(c: Celebration, poses: LoadedSprites, t: Float) {
+    if (t >= 1f) return
+    val first = poses.found ?: poses.celebrate ?: poses.run ?: return
+    val second = poses.celebrate ?: poses.found ?: poses.run ?: return
+    val third = poses.run ?: poses.celebrate ?: poses.found ?: return
+    val firstSize = first.size(this)
+    val secondSize = second.size(this)
+    val thirdSize = third.size(this)
+    val tallest = max(firstSize.height, max(secondSize.height, thirdSize.height))
+    val widest = max(firstSize.width, max(secondSize.width, thirdSize.width))
+    val jump = 30.dp.toPx()
+    val margin = 8.dp.toPx()
+
+    // Где лиса стоит: на верхнем крае элемента или рядом со стеной, из-за которой выглядывала.
+    val start = when (c.edge) {
+        Edge.TOP -> c.anchor
+        Edge.RIGHT -> Offset(c.anchor.x + c.shape.out * 0.55f, c.anchor.y + c.shape.after)
+        Edge.LEFT -> Offset(c.anchor.x - c.shape.out * 0.55f, c.anchor.y + c.shape.after)
+        Edge.BOTTOM -> Offset(c.anchor.x, c.anchor.y + c.shape.out)
+    }
+    // Целиком на экране, вместе с прыжком.
+    val minX = widest / 2f + margin
+    val minY = tallest + jump + margin
+    val ground = Offset(
+        start.x.coerceIn(minX, max(minX, size.width - widest / 2f - margin)),
+        start.y.coerceIn(minY, max(minY, size.height - margin)),
+    )
+
+    val ms = t * FOX_TOTAL_MS
+    val jumpsEnd = FOX_FOUND_MS + 2f * FOX_JUMP_MS
+    when {
+        ms < FOX_FOUND_MS -> {
+            val p = ms / FOX_FOUND_MS
+            val pop = if (p < 0.5f) {
+                0.8f + 0.3f * easeOut(p / 0.5f)
+            } else {
+                1.1f - 0.1f * easeOut((p - 0.5f) / 0.5f)
+            }
+            val lift = sin(PI.toFloat() * p) * 16.dp.toPx()
+            drawPose(first, first.image, Offset(ground.x, ground.y - lift), firstSize, scaleX = pop, scaleY = pop)
+        }
+        ms < jumpsEnd -> {
+            val q = (ms - FOX_FOUND_MS) / FOX_JUMP_MS
+            val p = q - floor(q)
+            val lift = 4f * p * (1f - p) * jump
+            // Сплющивание на приземлении и толчке.
+            val squash = when {
+                p < 0.12f -> 0.9f + 0.1f * (p / 0.12f)
+                p > 0.9f -> 1f - 0.1f * ((p - 0.9f) / 0.1f)
+                else -> 1f
+            }
+            drawPose(
+                second, second.image, Offset(ground.x, ground.y - lift), secondSize,
+                scaleX = 1f + (1f - squash) * 0.6f, scaleY = squash,
+            )
+        }
+        else -> {
+            val p = ((ms - jumpsEnd) / FOX_RUN_MS).coerceIn(0f, 1f)
+            val toLeft = ground.x < size.width / 2f
+            val target = if (toLeft) -thirdSize.width else size.width + thirdSize.width
+            val x = ground.x + (target - ground.x) * p * p
+            val bob = abs(sin(p * 3f * PI.toFloat())) * 8.dp.toPx()
+            drawPose(
+                third, third.image, Offset(x, ground.y - bob), thirdSize,
+                mirror = toLeft, rotation = if (toLeft) -8f else 8f,
+            )
+        }
+    }
+}
+
+private fun easeOut(x: Float): Float {
+    val v = 1f - x.coerceIn(0f, 1f)
+    return 1f - v * v
+}
+
 @Composable
 private fun FoundCard(c: Celebration, appear: () -> Float, onClick: () -> Unit) {
     val shape = RoundedCornerShape(22.dp)
@@ -525,9 +701,9 @@ private fun FoundCard(c: Celebration, appear: () -> Float, onClick: () -> Unit) 
             .padding(14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        val sprite = c.sprite
-        if (sprite != null) {
-            Image(bitmap = sprite, contentDescription = null, modifier = Modifier.size(52.dp))
+        val image = c.cardImage
+        if (image != null) {
+            Image(bitmap = image, contentDescription = null, modifier = Modifier.size(52.dp))
         } else {
             Canvas(Modifier.size(52.dp)) {
                 drawCreature(
