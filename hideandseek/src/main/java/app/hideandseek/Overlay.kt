@@ -131,6 +131,7 @@ internal fun HideAndSeekOverlay(controller: HideAndSeekController, modifier: Mod
             key(current.id) {
                 CelebrationLayer(
                     c = current,
+                    screenChanges = { controller.screenChanges },
                     // Лиса и звёздочки привязаны к элементу: едут вместе с ним при прокрутке
                     // и пропадают, если элемент ушёл с экрана (переключили вкладку).
                     anchorNow = {
@@ -520,6 +521,7 @@ private fun makeParticles(seed: Long, edge: Edge, base: Color, rare: Boolean): L
 @Composable
 private fun CelebrationLayer(
     c: Celebration,
+    screenChanges: () -> Int,
     anchorNow: () -> Offset?,
     onFinished: () -> Unit,
 ) {
@@ -535,13 +537,18 @@ private fun CelebrationLayer(
     LaunchedEffect(Unit) {
         fox.animateTo(1f, tween(durationMillis = FOX_TOTAL_MS, easing = LinearEasing))
     }
-    // Элемент ушёл с экрана (переключили вкладку): лиса и звёздочки сразу исчезают,
-    // а карточка «Нашёл!» уезжает. Касания по карточке и мимо неё её не закрывают —
-    // только смахивание вверх, смена вкладки или время из look.messageMs.
+    // Элемент ушёл с экрана (другая вкладка или прокрутили длинную ленту):
+    // лиса и звёздочки сразу исчезают, а не висят посреди экрана.
     LaunchedEffect(Unit) {
         snapshotFlow { anchorNow() == null }.first { it }
         burst.snapTo(1f)
         fox.snapTo(1f)
+    }
+    // Карточку убирают смахивание вверх, смена вкладки или время из look.messageMs.
+    // Касания по ней и мимо неё и прокрутка её не убирают.
+    val screenAtStart = remember { screenChanges() }
+    LaunchedEffect(Unit) {
+        snapshotFlow { screenChanges() }.first { it != screenAtStart }
         cardVisible = false
     }
     LaunchedEffect(cardVisible) {
@@ -566,26 +573,51 @@ private fun CelebrationLayer(
     if (cardShown) {
         val statusTop = WindowInsets.statusBars.getTop(LocalDensity.current)
         val navBottom = WindowInsets.navigationBars.getBottom(LocalDensity.current)
+        val place = remember { CardPlace() }
         // Карточка сверху экрана, а если там лиса — сразу под ней, чтобы её не закрывать.
+        // При прокрутке она едет вместе с экраном вверх, пока не упрётся в верх экрана.
         Layout(
             content = { FoundCard(c, appear = { card.value }, onDismiss = { cardVisible = false }) },
             modifier = Modifier.fillMaxSize(),
         ) { measurables, constraints ->
             val placeable = measurables.first().measure(constraints.copy(minWidth = 0, minHeight = 0))
             val screen = Size(constraints.maxWidth.toFloat(), constraints.maxHeight.toFloat())
-            val y = cardTop(
-                cardHeight = placeable.height.toFloat(),
-                natural = statusTop + 10.dp.toPx(),
-                bottomLimit = screen.height - navBottom - 96.dp.toPx(),
-                fox = foxArea(c, this, screen),
-                gap = 12.dp.toPx(),
-            )
+            val natural = statusTop + 10.dp.toPx()
+            if (place.start.isNaN()) {
+                place.start = cardTop(
+                    cardHeight = placeable.height.toFloat(),
+                    natural = natural,
+                    bottomLimit = screen.height - navBottom - 96.dp.toPx(),
+                    fox = foxArea(c, this, screen),
+                    gap = 12.dp.toPx(),
+                )
+            }
+            val a = anchorNow()
+            val y = when {
+                a != null -> followScroll(place.start, natural, scrolled = a.y - c.anchor.y)
+                place.last.isNaN() -> place.start
+                else -> place.last // элемент ушёл из ленты — карточка остаётся, где была
+            }
+            place.last = y
             layout(constraints.maxWidth, constraints.maxHeight) {
                 placeable.place((constraints.maxWidth - placeable.width) / 2, y.roundToInt())
             }
         }
     }
 }
+
+/** Где карточка: в момент находки ([start]) и в прошлом кадре ([last]). */
+private class CardPlace {
+    var start = Float.NaN
+    var last = Float.NaN
+}
+
+/**
+ * Карточка едет вместе с экраном на [scrolled] пикселей (вверх — минус), но не выше [natural]
+ * (верх экрана) и не ниже места, где появилась ([start]).
+ */
+internal fun followScroll(start: Float, natural: Float, scrolled: Float): Float =
+    (start + scrolled).coerceIn(min(natural, start), start)
 
 /**
  * Верх карточки: обычно [natural] (под статус-баром). Если там лиса ([fox] — где она по высоте

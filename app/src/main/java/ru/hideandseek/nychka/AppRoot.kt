@@ -48,7 +48,11 @@ fun AppRoot(initialTab: Tab = Tab.Main, initialDebug: Boolean = false) {
             }
             KidsTabBar(
                 selected = tab,
-                onSelect = { tab = it },
+                onSelect = {
+                    // Сменили вкладку — карточка «Нашёл!» убирается.
+                    if (it != tab) hideAndSeek?.onScreenChanged()
+                    tab = it
+                },
                 onPawLongPress = { debug = !debug },
                 modifier = Modifier.align(Alignment.BottomCenter),
             )

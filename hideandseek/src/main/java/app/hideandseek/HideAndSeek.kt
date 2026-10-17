@@ -357,6 +357,18 @@ class HideAndSeekController(
         return spots.last()
     }
 
+    /** Сколько раз приложение сообщило о смене экрана (см. [onScreenChanged]). */
+    internal var screenChanges: Int by mutableIntStateOf(0)
+        private set
+
+    /**
+     * Вызывайте при переходе на другой экран или вкладку: карточка «Нашёл!» уберётся.
+     * Прокрутка экрана её не убирает.
+     */
+    fun onScreenChanged() {
+        screenChanges++
+    }
+
     /** Demo: let today's creature hide again. */
     fun resetToday() {
         if (progress.lastFoundDay == today) {
