@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import ru.hideandseek.nychka.R
 import ru.hideandseek.nychka.hidespots.hideSpot
+import ru.hideandseek.nychka.hidespots.occluder
 import ru.hideandseek.nychka.ui.theme.KidsColors
 import ru.hideandseek.nychka.ui.theme.KidsType
 
@@ -58,7 +59,8 @@ fun KidsTabBar(
             .shadow(elevation = 18.dp, shape = shape, ambientColor = Color(0x33000000), spotColor = Color(0x33000000))
             .clip(shape)
             .background(Color.White)
-            .height(88.dp),
+            .height(88.dp)
+            .occluder("tabbar"),
     ) {
         Row(
             modifier = Modifier.fillMaxSize().padding(horizontal = 6.dp),

@@ -35,7 +35,16 @@ import androidx.compose.ui.unit.sp
  * Чтобы встроить механику в настоящий экран СберKids, достаточно повесить эти модификаторы
  * на существующие Composable-элементы и положить слой Нычки поверх экрана.
  */
-enum class SpotKind { Allowed, Forbidden }
+enum class SpotKind {
+    /** Сюда можно спрятаться. */
+    Allowed,
+
+    /** Сюда нельзя: Нычка не должна перекрывать этот элемент. */
+    Forbidden,
+
+    /** Плавающий элемент поверх контента (таб-бар): места под ним считаются невидимыми. */
+    Occluder,
+}
 
 @Immutable
 data class HideSpot(
@@ -52,9 +61,19 @@ class HideSpotRegistry {
     /** Все зарегистрированные места текущего экрана. */
     val spots: Map<String, HideSpot> get() = _spots
 
-    /** Места, где Нычке разрешено прятаться и которые сейчас видны на экране. */
-    fun visibleAllowed(): List<HideSpot> =
-        _spots.values.filter { it.kind == SpotKind.Allowed && !it.bounds.isEmpty }
+    /**
+     * Места, где Нычке разрешено прятаться прямо сейчас: элемент виден на экране
+     * и не уехал под плавающий таб-бар (элементы самого таб-бара — можно).
+     */
+    fun visibleAllowed(): List<HideSpot> {
+        val occluders = _spots.values
+            .filter { it.kind == SpotKind.Occluder && !it.bounds.isEmpty }
+            .map { it.bounds }
+        return _spots.values.filter { spot ->
+            spot.kind == SpotKind.Allowed && !spot.bounds.isEmpty &&
+                occluders.none { o -> o.overlaps(spot.bounds) && !o.contains(spot.bounds) }
+        }
+    }
 
     internal fun put(spot: HideSpot) {
         if (_spots[spot.id] != spot) _spots[spot.id] = spot
@@ -73,6 +92,12 @@ fun Modifier.hideSpot(id: String): Modifier = spot(id, SpotKind.Allowed)
 /** Элемент, который Нычка не должна перекрывать. */
 fun Modifier.noHideZone(id: String): Modifier = spot(id, SpotKind.Forbidden)
 
+/** Плавающий элемент поверх экрана (таб-бар): то, что под ним, спрятаться не может. */
+fun Modifier.occluder(id: String): Modifier = spot(id, SpotKind.Occluder)
+
+private fun Rect.contains(other: Rect): Boolean =
+    left <= other.left && top <= other.top && right >= other.right && bottom >= other.bottom
+
 private fun Modifier.spot(id: String, kind: SpotKind): Modifier = composed {
     val registry = LocalHideSpotRegistry.current
     if (registry == null) {
@@ -88,20 +113,29 @@ private fun Modifier.spot(id: String, kind: SpotKind): Modifier = composed {
 }
 
 /**
- * Отладочный слой: зелёные рамки — места для пряток, красные — запретные зоны.
+ * Отладочный слой: зелёные рамки — места для пряток, серые — места, закрытые таб-баром,
+ * красные — запретные зоны, синяя — перекрывающий элемент.
  * Включается долгим нажатием на лапку в таб-баре. Касания не перехватывает.
  */
 @Composable
 fun HideSpotDebugOverlay(registry: HideSpotRegistry, modifier: Modifier = Modifier) {
     val measurer = rememberTextMeasurer()
     val spots = registry.spots.values.toList()
+    val eligible = registry.visibleAllowed().map { it.id }.toSet()
     Canvas(modifier.fillMaxSize()) {
         val stroke = Stroke(width = 2.dp.toPx())
         for (spot in spots) {
             val b = spot.bounds
             if (b.isEmpty) continue
-            val color = if (spot.kind == SpotKind.Allowed) Color(0xFF1FAE45) else Color(0xFFE5484D)
-            drawRect(color.copy(alpha = 0.12f), topLeft = b.topLeft, size = b.size)
+            val color = when {
+                spot.kind == SpotKind.Occluder -> Color(0xFF3B82F6)
+                spot.kind == SpotKind.Forbidden -> Color(0xFFE5484D)
+                spot.id in eligible -> Color(0xFF1FAE45)
+                else -> Color(0xFF9AA0A6)
+            }
+            if (spot.kind != SpotKind.Occluder) {
+                drawRect(color.copy(alpha = 0.12f), topLeft = b.topLeft, size = b.size)
+            }
             drawRect(color, topLeft = b.topLeft, size = b.size, style = stroke)
             val labelX = b.left + 4.dp.toPx()
             val labelY = b.top + 2.dp.toPx()

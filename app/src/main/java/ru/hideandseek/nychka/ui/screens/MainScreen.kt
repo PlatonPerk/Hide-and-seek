@@ -59,7 +59,7 @@ import ru.hideandseek.nychka.ui.theme.KidsType
 /**
  * Вкладка «Главный» по макету Figma «Экраны главного».
  *
- * Места для пряток: main.avatar, main.card, main.page_dots, main.banner, main.history_title, main.history_button.
+ * Места для пряток: main.avatar, main.card, main.banner, main.history_title, main.history_button.
  * Запретные зоны: main.balance, main.action_qr, main.action_transfer, main.action_topup, main.history_1..3.
  */
 @Composable
@@ -81,7 +81,7 @@ fun MainScreen(modifier: Modifier = Modifier) {
         Spacer(Modifier.height(25.dp))
         CardWithBalance()
         Spacer(Modifier.height(16.dp))
-        PageDots(Modifier.align(Alignment.CenterHorizontally).hideSpot("main.page_dots"))
+        PageDots(Modifier.align(Alignment.CenterHorizontally))
         Spacer(Modifier.height(38.dp))
         QuickActions()
         Spacer(Modifier.height(42.dp))
