@@ -2,10 +2,14 @@ package ru.hideandseek.nychka
 
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipe
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.hideandseek.ContentSource
 import app.hideandseek.HideAndSeekController
@@ -92,9 +96,10 @@ class FoxScreenshotTest {
     }
 
     @Test
-    fun right() {
-        show(Tab.Main, "main.history_title", "right", 0.5)
-        capture("22_fox_right")
+    @Config(qualifiers = "w360dp-h3400dp-xhdpi")
+    fun leftMascot() {
+        show(Tab.Content, "content.algoritmika_mascot", "left", 0.5)
+        capture("22_fox_left_mascot")
     }
 
     @Test
@@ -113,5 +118,53 @@ class FoxScreenshotTest {
         capture("25_fox_celebrate")
         advance(900) // ~1,6 с плюс время на снимки: убегает (весь бег — 0,6 с)
         capture("26_fox_run")
+    }
+
+    private fun find() {
+        compose.onNodeWithContentDescription("Здесь кто-то прячется", substring = true).performClick()
+    }
+
+    @Test
+    fun cardIgnoresTapOnItAndClosesOnTapOutside() {
+        show(Tab.Main, "main.banner", "top", 0.85)
+        find()
+        advance(500)
+        compose.onNodeWithText("Нашёл!").performClick()
+        advance(400)
+        compose.onNodeWithText("Нашёл!").assertExists()
+        compose.onNodeWithText("История").performClick()
+        advance(400)
+        compose.onNodeWithText("Нашёл!").assertDoesNotExist()
+    }
+
+    @Test
+    fun cardStaysLong() {
+        show(Tab.Main, "main.banner", "top", 0.85)
+        find()
+        advance(10_000)
+        compose.onNodeWithText("Нашёл!").assertExists()
+    }
+
+    @Test
+    fun celebrationScrollsWithScreen() {
+        show(Tab.Main, "main.banner", "top", 0.85)
+        find()
+        advance(500)
+        compose.onRoot().performTouchInput {
+            swipe(Offset(centerX, height * 0.62f), Offset(centerX, height * 0.42f), durationMillis = 300)
+        }
+        advance(150)
+        capture("27_fox_scrolled")
+    }
+
+    @Test
+    fun celebrationDisappearsOnTabSwitch() {
+        show(Tab.Main, "main.banner", "top", 0.85)
+        find()
+        advance(500)
+        compose.onNodeWithText("Копилки").performClick()
+        advance(400)
+        compose.onNodeWithText("Нашёл!").assertDoesNotExist()
+        capture("28_fox_tab_switch")
     }
 }
