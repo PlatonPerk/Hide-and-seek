@@ -33,6 +33,12 @@ jobs:
           set -o pipefail
           ./gradlew :app:assembleDebug :app:assembleRelease --stacktrace 2>&1 | tee build.log
 
+      - name: Unit tests of the hideandseek module
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          ./gradlew :hideandseek:testDebugUnitTest --stacktrace 2>&1 | tee -a build.log
+
       - name: Render screens (Roborazzi)
         run: |
           set -o pipefail

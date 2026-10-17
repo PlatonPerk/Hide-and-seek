@@ -6,7 +6,22 @@ import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.Modifier
+import app.hideandseek.HideAndSeekHost
+import app.hideandseek.rememberHideAndSeekController
 import ru.hideandseek.nychka.ui.theme.NychkaTheme
+
+/**
+ * Откуда берётся контент «Пряток» (места, веса, расписание, тексты).
+ * В настоящем СберKids это ключ CMS; в прототипе — файл в этом репозитории на GitHub.
+ * Правка файла на GitHub меняет поведение без пересборки (кнопка «Обновить контент»
+ * в панели демо или перезапуск). Без сети берётся кеш или копия из assets.
+ */
+object NychkaConfig {
+    const val CONTENT_URL =
+        "https://raw.githubusercontent.com/ka12fy/SberHack/main/content/hideandseek.json"
+}
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -17,7 +32,12 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             NychkaTheme {
-                AppRoot()
+                // Один контроллер на всё приложение и один слой поверх всех экранов:
+                // это и есть встраивание модуля «Прятки».
+                val hideAndSeek = rememberHideAndSeekController(contentUrl = NychkaConfig.CONTENT_URL)
+                HideAndSeekHost(hideAndSeek, Modifier.fillMaxSize()) {
+                    AppRoot()
+                }
             }
         }
     }

@@ -1,8 +1,8 @@
 {
-  "version": 1,
+  "version": 2,
   "enabled": true,
   "timeZone": "Europe/Moscow",
-  "salt": "pryatunchiki-2026",
+  "salt": "nychka-2026",
 
   "schedule": {
     "startDate": "2026-10-01",
@@ -22,20 +22,23 @@
   },
 
   "creatures": [
-    { "id": "ryzhik",     "name": "Рыжик",    "color": "#FF8A3D", "weight": 10 },
-    { "id": "chernichka", "name": "Черничка", "color": "#7C6CF2", "weight": 8 },
-    { "id": "myatik",     "name": "Мятик",    "color": "#2EC4A0", "weight": 8 },
-    { "id": "zolotik",    "name": "Золотик",  "color": "#FFC23D", "weight": 1, "rare": true },
-    { "id": "snezhok",    "name": "Снежок",   "color": "#8FD3FF", "weight": 12, "from": "2026-12-15", "to": "2027-01-15" }
+    { "id": "nychka",  "name": "Нычка",          "color": "#FF8A3D", "weight": 10 },
+    { "id": "zolotik", "name": "Золотая Нычка",  "color": "#FFC23D", "weight": 1, "rare": true },
+    { "id": "snezhok", "name": "Снежная Нычка",  "color": "#8FD3FF", "weight": 12, "from": "2026-12-15", "to": "2027-01-15" }
   ],
 
   "spots": [
-    { "id": "home.balance", "edge": "top",    "align": 0.82, "weight": 3 },
-    { "id": "home.actions", "edge": "top",    "align": 0.5,  "weight": 2 },
-    { "id": "home.goal",    "edge": "top",    "align": 0.15, "weight": 2, "web": ".goal-card" },
-    { "id": "home.tasks",   "edge": "bottom", "align": 0.7,  "weight": 2 },
-    { "id": "lessons.card", "edge": "top",    "align": 0.85, "weight": 2 },
-    { "id": "nav.bar",      "edge": "top",    "align": 0.3,  "weight": 1 }
+    { "id": "main.banner",              "edge": "top",   "align": 0.85, "weight": 3 },
+    { "id": "main.card",                "edge": "top",   "align": 0.75, "weight": 2 },
+    { "id": "main.history_title",       "edge": "right", "align": 0.5,  "weight": 1 },
+    { "id": "piggy.goal",               "edge": "top",   "align": 0.85, "weight": 3 },
+    { "id": "piggy.pig",                "edge": "left",  "align": 0.6,  "weight": 2 },
+    { "id": "piggy.archive",            "edge": "top",   "align": 0.85, "weight": 1 },
+    { "id": "tasks.start_card",         "edge": "top",   "align": 0.85, "weight": 2 },
+    { "id": "tasks.section_title",      "edge": "right", "align": 0.5,  "weight": 1 },
+    { "id": "content.hero",             "edge": "top",   "align": 0.8,  "weight": 2 },
+    { "id": "content.audio",            "edge": "top",   "align": 0.85, "weight": 1 },
+    { "id": "content.algoritmika_mascot", "edge": "left", "align": 0.5, "weight": 1 }
   ],
 
   "tips": [
@@ -49,12 +52,14 @@
   ],
 
   "specialDays": [
-    { "date": "2026-12-31", "creature": "snezhok", "spot": "home.balance", "tip": "С наступающим! Подумай, на что будешь копить в новом году." }
+    { "date": "2026-10-18", "creature": "nychka", "spot": "main.banner" },
+    { "date": "2026-10-19", "creature": "nychka", "spot": "piggy.goal" },
+    { "date": "2026-12-31", "creature": "snezhok", "spot": "main.card", "tip": "С наступающим! Подумай, на что будешь копить в новом году." }
   ],
 
   "texts": {
     "foundTitle": "Нашёл!",
-    "foundBody": "{name} прятался именно здесь. Завтра спрячется в другом месте.",
+    "foundBody": "Вот где было укрытие! Завтра {name} спрячется в другом месте.",
     "streak": "Ты находишь меня {streakDays} подряд!",
     "tipTitle": "Совет дня",
     "accessibilityLabel": "Здесь кто-то прячется. Нажми, чтобы найти"

@@ -22,6 +22,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.hideandseek.hidingSpot
 
 /**
  * Места, где может спрятаться Нычка.
@@ -86,8 +87,12 @@ class HideSpotRegistry {
 
 val LocalHideSpotRegistry = staticCompositionLocalOf<HideSpotRegistry?> { null }
 
-/** Элемент, за которым может спрятаться Нычка. [id] должен совпадать с id в контент-конфиге. */
-fun Modifier.hideSpot(id: String): Modifier = spot(id, SpotKind.Allowed)
+/**
+ * Элемент, за которым может спрятаться Нычка. [id] должен совпадать с id места в контенте
+ * (`content/hideandseek.json`). Регистрирует элемент сразу в двух реестрах: в отладочном
+ * (рамки по долгому нажатию на лапку) и в модуле «Прятки», который рисует персонажа.
+ */
+fun Modifier.hideSpot(id: String): Modifier = spot(id, SpotKind.Allowed).hidingSpot(id)
 
 /** Элемент, который Нычка не должна перекрывать. */
 fun Modifier.noHideZone(id: String): Modifier = spot(id, SpotKind.Forbidden)

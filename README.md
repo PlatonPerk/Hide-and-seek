@@ -16,8 +16,12 @@
 - Отклик на нажатия: все кнопки, плитки и карточки проседают под пальцем и пружинят обратно
   (`Modifier.tappable`), с рябью и лёгкой вибрацией. Карта на «Главном» подпрыгивает по тапу,
   фильтры в «Контенте» переключаются, лайк и «играть/пауза» срабатывают.
-- Отладочный режим: **долгое нажатие на лапку** в таб-баре показывает все места на экране.
-  Зелёные рамки — разрешённые места, серые — места под таб-баром, красные — запретные зоны.
+- Нычка прячется по-настоящему: модуль `hideandseek` рисует её поверх экранов у места дня,
+  тап засчитывает находку (анимация, вибрация, карточка «Нашёл!» с советом дня).
+- Отладочный режим: **долгое нажатие на лапку** в таб-баре показывает все места на экране
+  и **панель демо**. Зелёные рамки — разрешённые места, серые — места под таб-баром, красные — запретные зоны.
+  В панели: где Нычка сегодня, «◀ день / день ▶» (перемотка дней), «Спрятать снова»,
+  «Обновить контент», «Сбросить все находки».
 
 ## Как запустить
 
@@ -59,18 +63,21 @@ app/src/main/assets/hideandseek/  копия контента внутри пр�
 ## Как это встраивается в настоящий СберKids
 
 ```kotlin
-// 1. Повесить якоря на существующие элементы экрана
-Avatar(modifier = Modifier.hideSpot("main.avatar"))
-QuickActions(modifier = Modifier.noHideZone("main.action_transfer"))
-
-// 2. Обернуть экран: реестр мест + слой Нычки поверх
-CompositionLocalProvider(LocalHideSpotRegistry provides registry) {
-    Box {
-        MainScreen()
-        NychkaLayer(registry)   // следующий шаг
-    }
+// 1. Один раз в корне приложения: контроллер и слой поверх всех экранов
+val hideAndSeek = rememberHideAndSeekController(source = ContentSource { cms.getJson("hide_seek_config") })
+HideAndSeekHost(hideAndSeek, Modifier.fillMaxSize()) {
+    AppRoot()
 }
+
+// 2. Повесить якоря на существующие элементы экрана (id = id места в контенте)
+Banner(modifier = Modifier.hidingSpot("main.banner"))
+
+// 3. На экранах оплаты, переводов, реквизитов и лимитов
+HideAndSeekBlocker()
 ```
+
+В прототипе это сделано в `MainActivity.kt`, а `Modifier.hideSpot(id)` из `hidespots/HideSpots.kt`
+одновременно регистрирует место и в отладочном реестре, и в модуле.
 
 На iOS тот же приём делается через `anchorPreference` / `GeometryReader` в SwiftUI.
 
@@ -85,4 +92,16 @@ CompositionLocalProvider(LocalHideSpotRegistry provides registry) {
 Логика и слой с персонажем живут в отдельном модуле `hideandseek` (подключён в `app` через
 `implementation(project(":hideandseek"))`). Подробности, формат контента и шаги встраивания —
 в [`hideandseek/README.md`](hideandseek/README.md).
+
+## Контент без релиза
+
+Приложение скачивает [`content/hideandseek.json`](content/hideandseek.json) прямо из этого репозитория
+(`NychkaConfig.CONTENT_URL` в `MainActivity.kt`); без сети берёт кеш или копию из
+`app/src/main/assets/hideandseek/content.json`. Чтобы поменять места, веса, тексты или персонажа:
+
+1. Отредактировать `content/hideandseek.json` на GitHub и сохранить.
+2. В приложении: долгое нажатие на лапку → «Обновить контент» (или перезапуск).
+
+`id` мест в JSON должны совпадать с `hideSpot("…")` на экранах. В `specialDays` задано, где Нычка
+прячется в день защиты (18.10 — баннер на «Главном»). После правки JSON стоит обновить и копию в `assets`.
 

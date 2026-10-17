@@ -3,6 +3,7 @@ package ru.hideandseek.nychka
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
@@ -12,6 +13,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import app.hideandseek.LocalHideAndSeek
+import ru.hideandseek.nychka.debug.DevPanel
 import ru.hideandseek.nychka.hidespots.HideSpotDebugOverlay
 import ru.hideandseek.nychka.hidespots.HideSpotRegistry
 import ru.hideandseek.nychka.hidespots.LocalHideSpotRegistry
@@ -25,13 +28,15 @@ import ru.hideandseek.nychka.ui.theme.KidsColors
 
 /**
  * Корень прототипа: имитация вкладок СберKids + реестр мест для пряток.
- * Слой с Нычкой будет жить здесь же, поверх экранов (следующий шаг).
+ * Слой с Нычкой рисует модуль «Прятки» (HideAndSeekHost в MainActivity) поверх всего этого.
+ * Долгое нажатие на лапку: рамки мест + панель демо (если корень обёрнут в HideAndSeekHost).
  */
 @Composable
 fun AppRoot(initialTab: Tab = Tab.Main, initialDebug: Boolean = false) {
     val registry = remember { HideSpotRegistry() }
     var tab by rememberSaveable { mutableStateOf(initialTab) }
     var debug by rememberSaveable { mutableStateOf(initialDebug) }
+    val hideAndSeek = LocalHideAndSeek.current
 
     CompositionLocalProvider(LocalHideSpotRegistry provides registry) {
         Box(Modifier.fillMaxSize().background(KidsColors.Page)) {
@@ -47,7 +52,16 @@ fun AppRoot(initialTab: Tab = Tab.Main, initialDebug: Boolean = false) {
                 onPawLongPress = { debug = !debug },
                 modifier = Modifier.align(Alignment.BottomCenter),
             )
-            if (debug) HideSpotDebugOverlay(registry)
+            if (debug) {
+                HideSpotDebugOverlay(registry)
+                if (hideAndSeek != null) {
+                    DevPanel(
+                        hideAndSeek = hideAndSeek,
+                        onClose = { debug = false },
+                        modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding(),
+                    )
+                }
+            }
         }
     }
 }
