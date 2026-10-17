@@ -12,9 +12,12 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import ru.hideandseek.nychka.hidespots.HideSpotDebugOverlay
 import ru.hideandseek.nychka.hidespots.HideSpotRegistry
 import ru.hideandseek.nychka.hidespots.LocalHideSpotRegistry
+import ru.hideandseek.nychka.nychka.NychkaController
+import ru.hideandseek.nychka.nychka.NychkaLayer
 import ru.hideandseek.nychka.ui.components.KidsTabBar
 import ru.hideandseek.nychka.ui.components.Tab
 import ru.hideandseek.nychka.ui.screens.ContentScreen
@@ -24,11 +27,19 @@ import ru.hideandseek.nychka.ui.screens.TasksScreen
 import ru.hideandseek.nychka.ui.theme.KidsColors
 
 /**
- * Корень прототипа: имитация вкладок СберKids + реестр мест для пряток.
- * Слой с Нычкой будет жить здесь же, поверх экранов (следующий шаг).
+ * Корень прототипа: имитация вкладок СберKids, реестр мест для пряток и слой Нычки поверх.
+ *
+ * Отладка для демо: долгое нажатие на лапку — рамки мест и плашка с местом дня;
+ * в этом режиме обычный тап по лапке переключает на следующий день.
  */
 @Composable
-fun AppRoot(initialTab: Tab = Tab.Main, initialDebug: Boolean = false) {
+fun AppRoot(
+    initialTab: Tab = Tab.Main,
+    initialDebug: Boolean = false,
+    nychka: NychkaController? = null,
+) {
+    val context = LocalContext.current
+    val controller = nychka ?: remember { NychkaController.create(context) }
     val registry = remember { HideSpotRegistry() }
     var tab by rememberSaveable { mutableStateOf(initialTab) }
     var debug by rememberSaveable { mutableStateOf(initialDebug) }
@@ -45,8 +56,10 @@ fun AppRoot(initialTab: Tab = Tab.Main, initialDebug: Boolean = false) {
                 selected = tab,
                 onSelect = { tab = it },
                 onPawLongPress = { debug = !debug },
+                onPawClick = { if (debug) controller.nextDay() },
                 modifier = Modifier.align(Alignment.BottomCenter),
             )
+            NychkaLayer(controller, registry, debug)
             if (debug) HideSpotDebugOverlay(registry)
         }
     }

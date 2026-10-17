@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "salt": "nychka-sberkids-2026",
+  "spots": [
+    { "id": "main.card", "weight": 5, "align": 0.62, "edge": 0.05 },
+    { "id": "main.history_title", "weight": 2, "align": 0.8, "edge": 0.0 },
+    { "id": "piggy.pig", "weight": 4, "align": 0.45, "edge": 0.32 },
+    { "id": "piggy.goal", "weight": 3, "align": 0.58, "edge": 0.0 },
+    { "id": "piggy.create", "weight": 2, "align": 0.8, "edge": 0.0 },
+    { "id": "tasks.start_card", "weight": 4, "align": 0.6, "edge": 0.0 },
+    { "id": "tasks.item_school", "weight": 3, "align": 0.5, "edge": 0.0 },
+    { "id": "tasks.more_button", "weight": 2, "align": 0.75, "edge": 0.0 },
+    { "id": "content.hero", "weight": 4, "align": 0.72, "edge": 0.0 },
+    { "id": "content.audio", "weight": 3, "align": 0.8, "edge": 0.0 },
+    { "id": "content.card_1", "weight": 2, "align": 0.75, "edge": 0.0 }
+  ],
+  "texts": {
+    "found": ["Нашёл! Вот это внимательность!", "Ой, попалась!", "Ты меня нашёл!", "Как ты меня заметил?"],
+    "streak": "Серия: {streak} {days} подряд",
+    "newSeries": "Начинаем новую серию!",
+    "best": "Рекорд: {best} {bestDays}",
+    "total": "Всего найдено: {total}",
+    "share": "Я нашёл Нычку в СберKids! Серия: {streak} {days}. А ты найдёшь?"
+  }
+}

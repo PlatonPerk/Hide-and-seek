@@ -54,6 +54,7 @@ fun KidsTabBar(
     onSelect: (Tab) -> Unit,
     onPawLongPress: () -> Unit,
     modifier: Modifier = Modifier,
+    onPawClick: () -> Unit = {},
 ) {
     val shape = RoundedCornerShape(28.dp)
     Box(
@@ -86,7 +87,7 @@ fun KidsTabBar(
                 activeIconOffsetX = (-4).dp, activeIconOffsetY = (-9).dp,
                 onClick = { onSelect(Tab.Piggy) },
             )
-            PawButton(onLongPress = onPawLongPress)
+            PawButton(onClick = onPawClick, onLongPress = onPawLongPress)
             TabItem(
                 label = "Дела", selected = selected == Tab.Tasks, spotId = "tab.tasks",
                 icon = R.drawable.tab_tasks, iconSize = Art.TabTasks,
@@ -167,7 +168,7 @@ private fun RowScope.TabItem(
 }
 
 @Composable
-private fun RowScope.PawButton(onLongPress: () -> Unit) {
+private fun RowScope.PawButton(onClick: () -> Unit, onLongPress: () -> Unit) {
     Box(
         modifier = Modifier
             .weight(1f)
@@ -178,7 +179,7 @@ private fun RowScope.PawButton(onLongPress: () -> Unit) {
             Modifier
                 .size(56.dp)
                 .offset(y = (-10).dp)
-                .tappable(pressedScale = 0.82f, ripple = false, onLongClick = onLongPress)
+                .tappable(pressedScale = 0.82f, ripple = false, onLongClick = onLongPress, onClick = onClick)
                 .hideSpot("tab.paw"),
             contentAlignment = Alignment.Center,
         ) {

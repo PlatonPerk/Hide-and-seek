@@ -16,6 +16,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.unit.toSize
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
@@ -52,6 +54,8 @@ data class HideSpot(
     val kind: SpotKind,
     /** Видимая часть элемента в координатах корня Compose. Пустая, если элемент проскроллен за экран. */
     val bounds: Rect,
+    /** Полные границы элемента без обрезки скроллом (могут выходить за экран). */
+    val raw: Rect = bounds,
 )
 
 @Stable
@@ -95,7 +99,7 @@ fun Modifier.noHideZone(id: String): Modifier = spot(id, SpotKind.Forbidden)
 /** Плавающий элемент поверх экрана (таб-бар): то, что под ним, спрятаться не может. */
 fun Modifier.occluder(id: String): Modifier = spot(id, SpotKind.Occluder)
 
-private fun Rect.contains(other: Rect): Boolean =
+internal fun Rect.contains(other: Rect): Boolean =
     left <= other.left && top <= other.top && right >= other.right && bottom >= other.bottom
 
 private fun Modifier.spot(id: String, kind: SpotKind): Modifier = composed {
@@ -107,7 +111,8 @@ private fun Modifier.spot(id: String, kind: SpotKind): Modifier = composed {
             onDispose { registry.remove(id) }
         }
         Modifier.onGloballyPositioned { coordinates ->
-            registry.put(HideSpot(id, kind, coordinates.boundsInRoot()))
+            val raw = Rect(coordinates.positionInRoot(), coordinates.size.toSize())
+            registry.put(HideSpot(id, kind, coordinates.boundsInRoot(), raw))
         }
     }
 }
