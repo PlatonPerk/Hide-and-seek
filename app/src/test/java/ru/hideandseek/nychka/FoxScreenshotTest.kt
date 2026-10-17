@@ -7,10 +7,12 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
@@ -166,8 +168,14 @@ class FoxScreenshotTest {
         compose.onNodeWithContentDescription("Здесь кто-то прячется", substring = true).performClick()
     }
 
+    private fun swipeCardUp() {
+        compose.onNodeWithText("Нашёл!").performTouchInput {
+            swipe(center, Offset(center.x, center.y - 400f), durationMillis = 150)
+        }
+    }
+
     @Test
-    fun cardIgnoresTapOnItAndClosesOnTapOutside() {
+    fun cardStaysOnTapsAndGoesOnSwipeUp() {
         show(Tab.Main, "main.banner", "top", 0.85)
         find()
         advance(500)
@@ -176,15 +184,32 @@ class FoxScreenshotTest {
         compose.onNodeWithText("Нашёл!").assertExists()
         compose.onNodeWithText("История").performClick()
         advance(400)
+        compose.onNodeWithText("Нашёл!").assertExists()
+        swipeCardUp()
+        advance(400)
         compose.onNodeWithText("Нашёл!").assertDoesNotExist()
     }
 
     @Test
-    fun cardStaysLong() {
+    fun cardHidesAfterMessageTime() {
+        val messageMs = bundledContent().getJSONObject("look").getLong("messageMs")
         show(Tab.Main, "main.banner", "top", 0.85)
         find()
-        advance(10_000)
+        advance(messageMs - 1_000)
         compose.onNodeWithText("Нашёл!").assertExists()
+        advance(2_000)
+        compose.onNodeWithText("Нашёл!").assertDoesNotExist()
+    }
+
+    /** Лиса у верха экрана (над картой): карточка встаёт под ней, а не сверху. */
+    @Test
+    fun cardGoesBelowFoxNearTop() {
+        show(Tab.Main, "main.card", "top", 0.75)
+        find()
+        advance(600)
+        val cardTop = compose.onNodeWithText("Нашёл!").getUnclippedBoundsInRoot().top
+        assertTrue("карточка начинается на $cardTop", cardTop > 150.dp)
+        capture("29_card_below_fox")
     }
 
     @Test
@@ -240,7 +265,7 @@ class FoxScreenshotTest {
         assertEquals("main.banner", controller.plan?.spot?.id)
         find()
         advance(500)
-        compose.onNodeWithText("История").performClick() // закрыть карточку касанием мимо
+        swipeCardUp()
         advance(3_000)
         assertEquals("piggy.goal", controller.plan?.spot?.id)
     }
