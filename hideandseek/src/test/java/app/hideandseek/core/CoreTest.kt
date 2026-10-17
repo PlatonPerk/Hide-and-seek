@@ -140,6 +140,28 @@ class CoreTest {
         for (i in 0 until 300) assertNotNull(DailyPlanner.plan(sample, start + i)) // endDate is 2027-08-31
         val newYear = DailyPlanner.plan(sample, Day.parse("2026-12-31")!!)!!
         assertEquals("snezhok", newYear.creature.id)
+        // У всех зверьков позы лисы: у Нычки свои, у остальных — через spritesFrom.
+        for (creature in sample.creatures) {
+            val sprites = creature.sprites
+            assertNotNull(creature.id, sprites)
+            assertEquals(0.356f, sprites!!.peek!!.anchorX)
+            assertEquals(0.941f, sprites.peek!!.anchorY)
+            assertEquals(0.081f, sprites.side!!.anchorX)
+            assertEquals(0.73f, sprites.side!!.anchorY)
+            assertNotNull(sprites.peek!!.blink)
+            assertNotNull(sprites.side!!.blink)
+            assertNotNull(sprites.found)
+            assertNotNull(sprites.celebrate)
+            assertNotNull(sprites.run)
+            assertTrue(sprites.urls.all { it.startsWith("asset:hideandseek/nychka/") && it.endsWith(".webp") })
+        }
+        // Файлы, на которые ссылается JSON, лежат в assets приложения.
+        val assets = listOf(File("../app/src/main/assets"), File("app/src/main/assets")).firstOrNull { it.exists() }
+        if (assets != null) {
+            for (url in sample.creatures.flatMap { it.sprites!!.urls }.distinct()) {
+                assertTrue(url, File(assets, url.removePrefix("asset:")).exists())
+            }
+        }
     }
 
     // ---- Sprites ----

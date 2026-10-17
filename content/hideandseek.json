@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "enabled": true,
   "timeZone": "Europe/Moscow",
   "salt": "nychka-2026",
@@ -22,9 +22,20 @@
   },
 
   "creatures": [
-    { "id": "nychka",  "name": "Нычка",          "color": "#FF8A3D", "weight": 10 },
-    { "id": "zolotik", "name": "Золотая Нычка",  "color": "#FFC23D", "weight": 1, "rare": true },
-    { "id": "snezhok", "name": "Снежная Нычка",  "color": "#8FD3FF", "weight": 12, "from": "2026-12-15", "to": "2027-01-15" }
+    {
+      "id": "nychka", "name": "Нычка", "color": "#FF8A3D", "weight": 10,
+      "sprites": {
+        "peek":      { "image": "asset:hideandseek/nychka/peek.webp", "blink": "asset:hideandseek/nychka/peek_blink.webp",
+                       "heightDp": 60, "anchor": [0.356, 0.941] },
+        "side":      { "image": "asset:hideandseek/nychka/side.webp", "blink": "asset:hideandseek/nychka/side_blink.webp",
+                       "heightDp": 76, "anchor": [0.081, 0.73] },
+        "found":     { "image": "asset:hideandseek/nychka/surprised.webp", "heightDp": 116, "anchor": [0.38, 0.995] },
+        "celebrate": { "image": "asset:hideandseek/nychka/celebrate.webp", "heightDp": 114, "anchor": [0.39, 0.995] },
+        "run":       { "image": "asset:hideandseek/nychka/run.webp", "heightDp": 112, "anchor": [0.62, 0.99] }
+      }
+    },
+    { "id": "zolotik", "name": "Золотая Нычка",  "color": "#FFC23D", "weight": 1, "rare": true, "spritesFrom": "nychka" },
+    { "id": "snezhok", "name": "Снежная Нычка",  "color": "#8FD3FF", "weight": 12, "from": "2026-12-15", "to": "2027-01-15", "spritesFrom": "nychka" }
   ],
 
   "spots": [

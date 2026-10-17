@@ -97,8 +97,10 @@ fun TransferScreen() {
 | `schedule.chancePercent` | шанс, что зверёк вообще спрячется в этот день (одинаковый у всех) |
 | `schedule.hours` | часы, когда он может появиться (`from`–`to`) |
 | `schedule.avoidRepeat` | не прятаться в одном месте два дня подряд |
-| `look` | `sizeDp`, `peek` (насколько выглядывает, 0..1), `appearDelayMs`, `messageMs` |
+| `look` | `sizeDp`, `peek` (насколько выглядывает, 0..1) — для зверька без поз; `appearDelayMs`, `messageMs` |
 | `creatures[]` | `id`, `name`, `color`, `weight`, `rare`, `from`/`to` (сезонные), `image` (PNG по https или `asset:путь`) |
+| `creatures[].sprites` | позы-картинки: `peek` (сверху), `side` (сбоку), `found`, `celebrate`, `run`; у каждой `image`, `blink` (кадр моргания), `heightDp`, `anchor: [x, y]` (доли картинки) |
+| `creatures[].spritesFrom` | взять позы у другого зверька по `id` |
 | `spots[]` | `id`, `edge` (top / bottom / left / right), `align` (0..1 вдоль края), `weight`, `web` (селектор для сайта), `from`/`to` |
 | `tips[]` | советы про деньги: строка или `{ "text", "from", "to" }` |
 | `specialDays[]` | `date` и `creature` / `spot` / `tip` — праздники и демо; `"skip": true` — выходной |
