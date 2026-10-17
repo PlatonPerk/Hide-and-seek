@@ -1,9 +1,14 @@
 package ru.hideandseek.nychka
 
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
@@ -17,6 +22,8 @@ import app.hideandseek.HideAndSeekHost
 import com.github.takahirom.roborazzi.captureRoboImage
 import org.json.JSONArray
 import org.json.JSONObject
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -45,18 +52,44 @@ class FoxScreenshotTest {
     private val noon = ZonedDateTime.of(2026, 11, 3, 12, 0, 0, 0, ZoneId.of("Europe/Moscow"))
         .toInstant().toEpochMilli()
 
-    private fun contentWith(spotId: String, edge: String, align: Double): String {
+    private class Spot(val id: String, val edge: String = "top", val align: Double = 0.5)
+
+    private fun bundledContent(): JSONObject {
         val app = RuntimeEnvironment.getApplication()
-        val text = app.assets.open("hideandseek/content.json").bufferedReader().use { it.readText() }
-        val json = JSONObject(text)
+        return JSONObject(app.assets.open("hideandseek/content.json").bufferedReader().use { it.readText() })
+    }
+
+    /** Встроенный контент, но только Нычка, только эти места и (если задано) место дня. */
+    private fun contentWith(spots: List<Spot>, spotOfTheDay: String? = null): String {
+        val json = bundledContent()
         val creatures = json.getJSONArray("creatures")
         val nychka = (0 until creatures.length()).map { creatures.getJSONObject(it) }.first { it.getString("id") == "nychka" }
         json.put("creatures", JSONArray().put(nychka))
-        json.put("spots", JSONArray().put(JSONObject().put("id", spotId).put("edge", edge).put("align", align)))
-        json.put("specialDays", JSONArray())
+        json.put(
+            "spots",
+            JSONArray().apply {
+                for (spot in spots) put(JSONObject().put("id", spot.id).put("edge", spot.edge).put("align", spot.align))
+            },
+        )
+        json.put(
+            "specialDays",
+            JSONArray().apply {
+                if (spotOfTheDay != null) put(JSONObject().put("date", "2026-11-03").put("spot", spotOfTheDay))
+            },
+        )
         json.getJSONObject("look").put("appearDelayMs", 0)
         return json.toString()
     }
+
+    private fun contentWith(spotId: String, edge: String, align: Double): String =
+        contentWith(listOf(Spot(spotId, edge, align)))
+
+    private fun controllerFor(json: String) = HideAndSeekController(
+        RuntimeEnvironment.getApplication(),
+        ContentSource { json },
+        bundledAsset = null,
+        clock = { noon },
+    )
 
     /** Время идёт вручную: загрузка контента и поз идёт в фоне, поэтому даём ей и реальное время. */
     private fun advance(ms: Long) {
@@ -70,14 +103,11 @@ class FoxScreenshotTest {
         }
     }
 
-    private fun show(tab: Tab, spotId: String, edge: String, align: Double) {
-        val json = contentWith(spotId, edge, align)
-        val controller = HideAndSeekController(
-            RuntimeEnvironment.getApplication(),
-            ContentSource { json },
-            bundledAsset = null,
-            clock = { noon },
-        )
+    private fun show(tab: Tab, spotId: String, edge: String, align: Double): HideAndSeekController =
+        show(tab, contentWith(spotId, edge, align))
+
+    private fun show(tab: Tab, json: String): HideAndSeekController {
+        val controller = controllerFor(json)
         compose.mainClock.autoAdvance = false
         compose.setContent {
             NychkaTheme {
@@ -85,7 +115,19 @@ class FoxScreenshotTest {
             }
         }
         advance(2_500) // контент и позы загрузились, лиса выглянула
+        return controller
     }
+
+    private fun tabOf(spotId: String): Tab = when (spotId.substringBefore('.')) {
+        "piggy" -> Tab.Piggy
+        "tasks" -> Tab.Tasks
+        "content" -> Tab.Content
+        else -> Tab.Main
+    }
+
+    private fun foxShown(): Boolean = compose
+        .onAllNodesWithContentDescription("Здесь кто-то прячется", substring = true)
+        .fetchSemanticsNodes().isNotEmpty()
 
     private fun capture(name: String) = compose.onRoot().captureRoboImage("build/outputs/roborazzi/$name.png")
 
@@ -155,6 +197,52 @@ class FoxScreenshotTest {
         }
         advance(150)
         capture("27_fox_scrolled")
+    }
+
+    /** Каждое место из контента на своей вкладке: лиса там правда появляется (экран высокий, без прокрутки). */
+    @Test
+    @Config(qualifiers = "w360dp-h3400dp-xhdpi")
+    fun everySpotInContentShowsTheFox() {
+        val list = bundledContent().getJSONArray("spots")
+        val spots = (0 until list.length()).map { list.getJSONObject(it) }
+            .map { Spot(it.getString("id"), it.optString("edge", "top"), it.optDouble("align", 0.5)) }
+        val controllers = spots.map { controllerFor(contentWith(listOf(it))) }
+        var index by mutableIntStateOf(-1)
+        compose.mainClock.autoAdvance = false
+        compose.setContent {
+            NychkaTheme {
+                val i = index
+                if (i >= 0) {
+                    key(i) {
+                        HideAndSeekHost(controllers[i], Modifier.fillMaxSize()) { AppRoot(initialTab = tabOf(spots[i].id)) }
+                    }
+                }
+            }
+        }
+        val missing = mutableListOf<String>()
+        for (i in spots.indices) {
+            index = i
+            advance(2_500)
+            if (!foxShown()) missing += spots[i].id
+        }
+        assertTrue("Лиса не появилась: $missing", missing.isEmpty())
+    }
+
+    /** Перепрятка: после находки на «Главном» лиса прячется на другой вкладке. */
+    @Test
+    fun rehideMovesToAnotherScreen() {
+        val json = contentWith(
+            listOf(Spot("main.banner", align = 0.85), Spot("main.card", align = 0.75), Spot("piggy.goal", align = 0.85)),
+            spotOfTheDay = "main.banner",
+        )
+        val controller = show(Tab.Main, json)
+        compose.runOnIdle { controller.demoRehide = true }
+        assertEquals("main.banner", controller.plan?.spot?.id)
+        find()
+        advance(500)
+        compose.onNodeWithText("История").performClick() // закрыть карточку касанием мимо
+        advance(3_000)
+        assertEquals("piggy.goal", controller.plan?.spot?.id)
     }
 
     @Test
