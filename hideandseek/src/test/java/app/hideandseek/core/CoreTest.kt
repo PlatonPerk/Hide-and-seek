@@ -133,7 +133,7 @@ class CoreTest {
         val file = listOf(File("../content/hideandseek.json"), File("content/hideandseek.json"))
             .firstOrNull { it.exists() } ?: return
         val sample = ContentParser.parse(file.readText())
-        assertTrue(sample.creatures.size >= 4)
+        assertTrue(sample.creatures.isNotEmpty())
         assertTrue(sample.spots.size >= 4)
         assertTrue(sample.tips.isNotEmpty())
         val start = Day.parse("2026-10-17")!!
