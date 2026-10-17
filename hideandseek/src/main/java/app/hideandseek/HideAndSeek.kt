@@ -21,9 +21,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.input.pointer.PointerEventPass
-import androidx.compose.ui.input.pointer.changedToDown
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
@@ -86,24 +83,10 @@ fun HideAndSeekHost(
             controller.tick() // day rollover at midnight, active hours
         }
     }
-    val touches = remember(controller) { OverlayTouches() }
     CompositionLocalProvider(LocalHideAndSeek provides controller) {
-        Box(
-            modifier.pointerInput(touches) {
-                // Только смотрим на касания, ничего не забирая у приложения: касание мимо
-                // карточки «Нашёл!» (тап, начало прокрутки, смена вкладки) её закрывает.
-                awaitPointerEventScope {
-                    while (true) {
-                        val event = awaitPointerEvent(PointerEventPass.Initial)
-                        for (change in event.changes) {
-                            if (change.changedToDown()) touches.press(change.position)
-                        }
-                    }
-                }
-            },
-        ) {
+        Box(modifier) {
             content()
-            HideAndSeekOverlay(controller, touches, Modifier.matchParentSize())
+            HideAndSeekOverlay(controller, Modifier.matchParentSize())
         }
     }
 }

@@ -8,7 +8,10 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,21 +23,18 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -55,7 +55,8 @@ import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.input.pointer.util.VelocityTracker
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
@@ -66,6 +67,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -77,6 +79,7 @@ import app.hideandseek.core.SpotDef
 import app.hideandseek.core.TextTemplate
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
@@ -102,7 +105,7 @@ private const val FOX_TOTAL_MS = FOX_FOUND_MS + 2 * FOX_JUMP_MS + FOX_RUN_MS
  * through to the screen underneath.
  */
 @Composable
-internal fun HideAndSeekOverlay(controller: HideAndSeekController, touches: OverlayTouches, modifier: Modifier) {
+internal fun HideAndSeekOverlay(controller: HideAndSeekController, modifier: Modifier) {
     val content = controller.content
     val plan = controller.plan
     val frame = remember { OverlayFrame() }
@@ -138,8 +141,6 @@ internal fun HideAndSeekOverlay(controller: HideAndSeekController, touches: Over
                             controller.registry.find(current.spotId)?.let { it.bounds.topLeft + offset - frame.origin }
                         }
                     },
-                    touches = touches,
-                    frame = frame,
                 ) {
                     if (celebration?.id == current.id) celebration = null
                     controller.afterFound() // режим демо: перепрятаться в другом месте
@@ -162,22 +163,6 @@ internal class OverlayFrame {
 
 private class LastAnchor {
     var value: Offset? = null
-}
-
-/** Касания экрана для карточки «Нашёл!»: она закрывается касанием мимо неё. */
-@Stable
-internal class OverlayTouches {
-    /** Где сейчас карточка, в координатах слоя; null — карточки нет. */
-    var card: Rect? = null
-
-    /** Сколько раз коснулись экрана мимо карточки. */
-    var outsidePresses by mutableIntStateOf(0)
-        private set
-
-    fun press(position: Offset) {
-        val bounds = card ?: return
-        if (!bounds.contains(position)) outsidePresses++
-    }
 }
 
 @Composable
@@ -536,8 +521,6 @@ private fun makeParticles(seed: Long, edge: Edge, base: Color, rare: Boolean): L
 private fun CelebrationLayer(
     c: Celebration,
     anchorNow: () -> Offset?,
-    touches: OverlayTouches,
-    frame: OverlayFrame,
     onFinished: () -> Unit,
 ) {
     val burst = remember { Animatable(0f) }
@@ -545,7 +528,6 @@ private fun CelebrationLayer(
     val card = remember { Animatable(0f) }
     var cardVisible by remember { mutableStateOf(true) }
     val particles = remember(c.id) { makeParticles(c.id, c.edge, Color(c.creature.color), c.creature.rare) }
-    val pressesAtStart = remember { touches.outsidePresses }
 
     LaunchedEffect(Unit) {
         burst.animateTo(1f, tween(durationMillis = 1300, easing = LinearEasing))
@@ -553,19 +535,14 @@ private fun CelebrationLayer(
     LaunchedEffect(Unit) {
         fox.animateTo(1f, tween(durationMillis = FOX_TOTAL_MS, easing = LinearEasing))
     }
-    // Элемент ушёл с экрана (переключили вкладку) — лиса и звёздочки сразу исчезают, а не висят посреди экрана.
+    // Элемент ушёл с экрана (переключили вкладку): лиса и звёздочки сразу исчезают,
+    // а карточка «Нашёл!» уезжает. Касания по карточке и мимо неё её не закрывают —
+    // только смахивание вверх, смена вкладки или время из look.messageMs.
     LaunchedEffect(Unit) {
         snapshotFlow { anchorNow() == null }.first { it }
         burst.snapTo(1f)
         fox.snapTo(1f)
-    }
-    // Касание мимо карточки (тап, прокрутка, другая вкладка) закрывает её. Касание по карточке — ничего.
-    LaunchedEffect(Unit) {
-        snapshotFlow { touches.outsidePresses }.first { it != pressesAtStart }
         cardVisible = false
-    }
-    DisposableEffect(Unit) {
-        onDispose { touches.card = null }
     }
     LaunchedEffect(cardVisible) {
         if (cardVisible) {
@@ -587,15 +564,61 @@ private fun CelebrationLayer(
 
     val cardShown by remember { derivedStateOf { card.value > 0.01f } }
     if (cardShown) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
-            FoundCard(
-                c,
-                appear = { card.value },
-                onBounds = { bounds -> touches.card = bounds.translate(-frame.origin) },
+        val statusTop = WindowInsets.statusBars.getTop(LocalDensity.current)
+        val navBottom = WindowInsets.navigationBars.getBottom(LocalDensity.current)
+        // Карточка сверху экрана, а если там лиса — сразу под ней, чтобы её не закрывать.
+        Layout(
+            content = { FoundCard(c, appear = { card.value }, onDismiss = { cardVisible = false }) },
+            modifier = Modifier.fillMaxSize(),
+        ) { measurables, constraints ->
+            val placeable = measurables.first().measure(constraints.copy(minWidth = 0, minHeight = 0))
+            val screen = Size(constraints.maxWidth.toFloat(), constraints.maxHeight.toFloat())
+            val y = cardTop(
+                cardHeight = placeable.height.toFloat(),
+                natural = statusTop + 10.dp.toPx(),
+                bottomLimit = screen.height - navBottom - 96.dp.toPx(),
+                fox = foxArea(c, this, screen),
+                gap = 12.dp.toPx(),
             )
+            layout(constraints.maxWidth, constraints.maxHeight) {
+                placeable.place((constraints.maxWidth - placeable.width) / 2, y.roundToInt())
+            }
         }
-    } else {
-        SideEffect { touches.card = null }
+    }
+}
+
+/**
+ * Верх карточки: обычно [natural] (под статус-баром). Если там лиса ([fox] — где она по высоте
+ * во время выхода), то сразу под лисой, если карточка там помещается до [bottomLimit].
+ */
+internal fun cardTop(
+    cardHeight: Float,
+    natural: Float,
+    bottomLimit: Float,
+    fox: ClosedFloatingPointRange<Float>?,
+    gap: Float,
+): Float {
+    if (fox == null) return natural
+    val overlaps = natural < fox.endInclusive + gap && natural + cardHeight > fox.start - gap
+    if (!overlaps) return natural
+    val below = fox.endInclusive + gap
+    return if (below + cardHeight <= bottomLimit) below else natural
+}
+
+/** Где по высоте лиса во время выхода после находки (в момент тапа), в координатах слоя. */
+private fun foxArea(c: Celebration, density: Density, screen: Size): ClosedFloatingPointRange<Float>? {
+    val poses = c.poses
+    if (poses != null) {
+        val stage = foxStage(c, poses, density, screen) ?: return null
+        return (stage.fitted.y - stage.tallest - stage.jump)..stage.fitted.y
+    }
+    // Прежний зверёк выпрыгивает из-за края примерно на два своих роста.
+    val s = c.sizePx
+    val y = c.anchor.y
+    return when (c.edge) {
+        Edge.TOP -> (y - 2.3f * s)..(y + 0.3f * s)
+        Edge.BOTTOM -> (y - 0.3f * s)..(y + 2.3f * s)
+        Edge.LEFT, Edge.RIGHT -> (y - 1.4f * s)..(y + 1.4f * s)
     }
 }
 
@@ -676,36 +699,65 @@ private fun DrawScope.drawCelebration(c: Celebration, a: Offset, particles: List
  * run — наклон 8° и рывок за ближайший край экрана с покачиванием.
  * Если какой-то позы нет, её место занимает соседняя.
  */
-private fun DrawScope.drawFoxCelebration(c: Celebration, a: Offset, poses: LoadedSprites, t: Float) {
-    if (t >= 1f) return
-    val first = poses.found ?: poses.celebrate ?: poses.run ?: return
-    val second = poses.celebrate ?: poses.found ?: poses.run ?: return
-    val third = poses.run ?: poses.celebrate ?: poses.found ?: return
-    val firstSize = first.size(this)
-    val secondSize = second.size(this)
-    val thirdSize = third.size(this)
+/** Как лиса выходит после находки: позы трёх фаз, их размеры и место, где она стоит. */
+private class FoxStage(
+    val first: LoadedPose,
+    val second: LoadedPose,
+    val third: LoadedPose,
+    val firstSize: Size,
+    val secondSize: Size,
+    val thirdSize: Size,
+    val tallest: Float,
+    val jump: Float,
+    /** Где лиса стоит в момент находки, сдвинутая так, чтобы целиком была на экране. */
+    val fitted: Offset,
+    /** Этот сдвиг; дальше лиса едет вместе с элементом. */
+    val shift: Offset,
+)
+
+/** Где лиса стоит: на верхнем крае элемента или рядом со стеной, из-за которой выглядывала. */
+private fun standAt(c: Celebration, p: Offset): Offset = when (c.edge) {
+    Edge.TOP -> p
+    Edge.RIGHT -> Offset(p.x + c.shape.out * 0.55f, p.y + c.shape.after)
+    Edge.LEFT -> Offset(p.x - c.shape.out * 0.55f, p.y + c.shape.after)
+    Edge.BOTTOM -> Offset(p.x, p.y + c.shape.out)
+}
+
+private fun foxStage(c: Celebration, poses: LoadedSprites, density: Density, screen: Size): FoxStage? {
+    val first = poses.found ?: poses.celebrate ?: poses.run ?: return null
+    val second = poses.celebrate ?: poses.found ?: poses.run ?: return null
+    val third = poses.run ?: poses.celebrate ?: poses.found ?: return null
+    val firstSize = first.size(density)
+    val secondSize = second.size(density)
+    val thirdSize = third.size(density)
     val tallest = max(firstSize.height, max(secondSize.height, thirdSize.height))
     val widest = max(firstSize.width, max(secondSize.width, thirdSize.width))
-    val jump = 30.dp.toPx()
-    val margin = 8.dp.toPx()
-
-    // Где лиса стоит: на верхнем крае элемента или рядом со стеной, из-за которой выглядывала.
-    fun standAt(p: Offset): Offset = when (c.edge) {
-        Edge.TOP -> p
-        Edge.RIGHT -> Offset(p.x + c.shape.out * 0.55f, p.y + c.shape.after)
-        Edge.LEFT -> Offset(p.x - c.shape.out * 0.55f, p.y + c.shape.after)
-        Edge.BOTTOM -> Offset(p.x, p.y + c.shape.out)
-    }
-    // В момент находки лиса целиком на экране, вместе с прыжком. Этот сдвиг считаем один раз
+    val jump = with(density) { 30.dp.toPx() }
+    val margin = with(density) { 8.dp.toPx() }
+    // В момент находки лиса целиком на экране, вместе с прыжком. Сдвиг считаем один раз
     // по исходной точке, а дальше лиса едет вместе с элементом.
-    val start = standAt(c.anchor)
+    val start = standAt(c, c.anchor)
     val minX = widest / 2f + margin
     val minY = tallest + jump + margin
     val fitted = Offset(
-        start.x.coerceIn(minX, max(minX, size.width - widest / 2f - margin)),
-        start.y.coerceIn(minY, max(minY, size.height - margin)),
+        start.x.coerceIn(minX, max(minX, screen.width - widest / 2f - margin)),
+        start.y.coerceIn(minY, max(minY, screen.height - margin)),
     )
-    val ground = standAt(a) + (fitted - start)
+    return FoxStage(first, second, third, firstSize, secondSize, thirdSize, tallest, jump, fitted, fitted - start)
+}
+
+private fun DrawScope.drawFoxCelebration(c: Celebration, a: Offset, poses: LoadedSprites, t: Float) {
+    if (t >= 1f) return
+    val stage = foxStage(c, poses, this, size) ?: return
+    val first = stage.first
+    val second = stage.second
+    val third = stage.third
+    val firstSize = stage.firstSize
+    val secondSize = stage.secondSize
+    val thirdSize = stage.thirdSize
+    val jump = stage.jump
+    val fitted = stage.fitted
+    val ground = standAt(c, a) + stage.shift
 
     val ms = t * FOX_TOTAL_MS
     val jumpsEnd = FOX_FOUND_MS + 2f * FOX_JUMP_MS
@@ -755,30 +807,74 @@ private fun easeOut(x: Float): Float {
 }
 
 @Composable
-private fun FoundCard(c: Celebration, appear: () -> Float, onBounds: (Rect) -> Unit) {
+private fun FoundCard(c: Celebration, appear: () -> Float, onDismiss: () -> Unit) {
     val shape = RoundedCornerShape(22.dp)
     val accent = Color(c.creature.color)
-    Row(
+    val scope = rememberCoroutineScope()
+    // Насколько карточку утянули пальцем (вверх — минус).
+    val drag = remember { Animatable(0f) }
+    Column(
         modifier = Modifier
-            .statusBarsPadding()
-            .padding(horizontal = 16.dp, vertical = 10.dp)
+            .padding(horizontal = 16.dp)
             .widthIn(max = 440.dp)
             .fillMaxWidth()
             .graphicsLayer {
                 val a = appear()
-                alpha = a
-                translationY = (1f - a) * -32.dp.toPx()
+                val swiped = (-drag.value / (size.height * 0.8f)).coerceIn(0f, 1f)
+                alpha = a * (1f - swiped)
+                translationY = (1f - a) * -32.dp.toPx() + drag.value
                 scaleX = 0.94f + 0.06f * a
                 scaleY = 0.94f + 0.06f * a
             }
-            .onGloballyPositioned { onBounds(it.boundsInRoot()) }
             .shadow(elevation = 12.dp, shape = shape)
             .background(Color.White, shape)
-            // Касание по карточке ничего не делает и не проходит к экрану под ней.
-            .pointerInput(Unit) { detectTapGestures { } }
-            .padding(14.dp),
-        verticalAlignment = Alignment.CenterVertically,
+            // Смахивание вверх убирает карточку. Касание по ней ничего не делает и не проходит к экрану под ней.
+            .pointerInput(Unit) {
+                val tracker = VelocityTracker()
+                val dismissDistance = 48.dp.toPx()
+                val maxDown = 24.dp.toPx()
+                var offset = 0f
+                detectVerticalDragGestures(
+                    onDragStart = {
+                        tracker.resetTracking()
+                        offset = drag.value
+                    },
+                    onDragEnd = {
+                        val flungUp = tracker.calculateVelocity().y < -1200f
+                        if (offset < -dismissDistance || flungUp) {
+                            onDismiss()
+                            scope.launch { drag.animateTo(-size.height * 1.5f, tween(durationMillis = 200)) }
+                        } else {
+                            scope.launch { drag.animateTo(0f, spring(dampingRatio = 0.6f)) }
+                        }
+                    },
+                    onDragCancel = { scope.launch { drag.animateTo(0f, spring(dampingRatio = 0.6f)) } },
+                    onVerticalDrag = { change, amount ->
+                        change.consume()
+                        // Вверх — свободно, вниз — туго и недалеко.
+                        offset = (offset + if (offset + amount > 0f) amount * 0.25f else amount).coerceAtMost(maxDown)
+                        tracker.addPosition(change.uptimeMillis, Offset(0f, offset))
+                        scope.launch { drag.snapTo(offset) }
+                    },
+                )
+            }
+            .padding(start = 14.dp, top = 14.dp, end = 14.dp, bottom = 8.dp),
     ) {
+        FoundCardContent(c, accent)
+        // «Ручка» снизу: подсказка, что карточку можно смахнуть.
+        Box(
+            Modifier
+                .padding(top = 8.dp)
+                .align(Alignment.CenterHorizontally)
+                .size(width = 36.dp, height = 4.dp)
+                .background(CardInkSoft.copy(alpha = 0.3f), RoundedCornerShape(2.dp)),
+        )
+    }
+}
+
+@Composable
+private fun FoundCardContent(c: Celebration, accent: Color) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
         val image = c.cardImage
         if (image != null) {
             Image(bitmap = image, contentDescription = null, modifier = Modifier.size(52.dp))
