@@ -1,0 +1,74 @@
+name: Android build
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Build debug APK
+        run: |
+          chmod +x gradlew
+          set -o pipefail
+          ./gradlew :app:assembleDebug --stacktrace 2>&1 | tee build.log
+
+      - name: Render screens (Roborazzi)
+        run: |
+          set -o pipefail
+          ./gradlew :app:recordRoborazziDebug --stacktrace 2>&1 | tee -a build.log
+
+      - name: Upload APK
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nychka-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: ignore
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: app/build/outputs/roborazzi/
+          if-no-files-found: ignore
+
+      # Последний APK, скриншоты и лог сборки — в ветке ci-results (перезаписывается каждый раз).
+      - name: Publish results to ci-results branch
+        if: always() && github.event_name != 'pull_request'
+        run: |
+          mkdir -p /tmp/out
+          cp build.log /tmp/out/ 2>/dev/null || true
+          cp app/build/outputs/roborazzi/*.png /tmp/out/ 2>/dev/null || true
+          cp app/build/outputs/apk/debug/*.apk /tmp/out/nychka-debug.apk 2>/dev/null || true
+          mkdir -p /tmp/out/test-reports
+          cp -r app/build/reports/tests/* /tmp/out/test-reports/ 2>/dev/null || true
+          echo "${GITHUB_SHA}" > /tmp/out/SHA
+          cd /tmp/out
+          git init -q -b ci-results
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "CI results for ${GITHUB_SHA}"
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git" ci-results

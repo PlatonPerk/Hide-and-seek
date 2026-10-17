@@ -1,0 +1,118 @@
+package ru.hideandseek.nychka.hidespots
+
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.drawText
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+
+/**
+ * Места, где может спрятаться Нычка.
+ *
+ * Экран помечает свои элементы модификаторами:
+ *  - [hideSpot] — сюда прятаться можно (аватар, баннер, карточка контента…);
+ *  - [noHideZone] — сюда нельзя (кнопки оплаты и переводов, баланс, суммы, реклама).
+ *
+ * Модификатор сообщает координаты элемента в [HideSpotRegistry] при каждой раскладке,
+ * поэтому слой с Нычкой всегда знает, где элемент сейчас на экране — даже при скролле.
+ * Чтобы встроить механику в настоящий экран СберKids, достаточно повесить эти модификаторы
+ * на существующие Composable-элементы и положить слой Нычки поверх экрана.
+ */
+enum class SpotKind { Allowed, Forbidden }
+
+@Immutable
+data class HideSpot(
+    val id: String,
+    val kind: SpotKind,
+    /** Видимая часть элемента в координатах корня Compose. Пустая, если элемент проскроллен за экран. */
+    val bounds: Rect,
+)
+
+@Stable
+class HideSpotRegistry {
+    private val _spots = mutableStateMapOf<String, HideSpot>()
+
+    /** Все зарегистрированные места текущего экрана. */
+    val spots: Map<String, HideSpot> get() = _spots
+
+    /** Места, где Нычке разрешено прятаться и которые сейчас видны на экране. */
+    fun visibleAllowed(): List<HideSpot> =
+        _spots.values.filter { it.kind == SpotKind.Allowed && !it.bounds.isEmpty }
+
+    internal fun put(spot: HideSpot) {
+        if (_spots[spot.id] != spot) _spots[spot.id] = spot
+    }
+
+    internal fun remove(id: String) {
+        _spots.remove(id)
+    }
+}
+
+val LocalHideSpotRegistry = staticCompositionLocalOf<HideSpotRegistry?> { null }
+
+/** Элемент, за которым может спрятаться Нычка. [id] должен совпадать с id в контент-конфиге. */
+fun Modifier.hideSpot(id: String): Modifier = spot(id, SpotKind.Allowed)
+
+/** Элемент, который Нычка не должна перекрывать. */
+fun Modifier.noHideZone(id: String): Modifier = spot(id, SpotKind.Forbidden)
+
+private fun Modifier.spot(id: String, kind: SpotKind): Modifier = composed {
+    val registry = LocalHideSpotRegistry.current
+    if (registry == null) {
+        Modifier
+    } else {
+        DisposableEffect(registry, id) {
+            onDispose { registry.remove(id) }
+        }
+        Modifier.onGloballyPositioned { coordinates ->
+            registry.put(HideSpot(id, kind, coordinates.boundsInRoot()))
+        }
+    }
+}
+
+/**
+ * Отладочный слой: зелёные рамки — места для пряток, красные — запретные зоны.
+ * Включается долгим нажатием на лапку в таб-баре. Касания не перехватывает.
+ */
+@Composable
+fun HideSpotDebugOverlay(registry: HideSpotRegistry, modifier: Modifier = Modifier) {
+    val measurer = rememberTextMeasurer()
+    val spots = registry.spots.values.toList()
+    Canvas(modifier.fillMaxSize()) {
+        val stroke = Stroke(width = 2.dp.toPx())
+        for (spot in spots) {
+            val b = spot.bounds
+            if (b.isEmpty) continue
+            val color = if (spot.kind == SpotKind.Allowed) Color(0xFF1FAE45) else Color(0xFFE5484D)
+            drawRect(color.copy(alpha = 0.12f), topLeft = b.topLeft, size = b.size)
+            drawRect(color, topLeft = b.topLeft, size = b.size, style = stroke)
+            val labelX = b.left + 4.dp.toPx()
+            val labelY = b.top + 2.dp.toPx()
+            if (labelX < size.width - 60.dp.toPx() && labelY < size.height - 14.dp.toPx() && labelY >= 0f) {
+                drawText(
+                    textMeasurer = measurer,
+                    text = spot.id,
+                    topLeft = Offset(labelX, labelY),
+                    style = TextStyle(fontSize = 9.sp, fontWeight = FontWeight.Bold, color = color),
+                )
+            }
+        }
+    }
+}
