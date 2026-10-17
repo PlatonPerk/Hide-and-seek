@@ -20,10 +20,27 @@ android {
         versionName = "0.1"
     }
 
+    // Общий демо-ключ в репозитории: debug- и release-сборки из CI ставятся поверх друг друга
+    // без удаления приложения. Для прототипа это нормально, для продакшена — нет.
+    signingConfigs {
+        create("demo") {
+            storeFile = file("nychka-demo.keystore")
+            storePassword = "android"
+            keyAlias = "nychka"
+            keyPassword = "android"
+        }
+    }
+
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("demo")
+        }
+        // Release — для демо на телефоне: R8 + без отладочного режима. Compose в debug-сборке
+        // работает в разы медленнее, и на скролле это видно как пропуски кадров.
         release {
+            signingConfig = signingConfigs.getByName("demo")
             optimization {
-                enable = false
+                enable = true
             }
         }
     }

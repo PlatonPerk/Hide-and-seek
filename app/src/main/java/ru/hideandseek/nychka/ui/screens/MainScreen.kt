@@ -1,9 +1,13 @@
 package ru.hideandseek.nychka.ui.screens
 
 import androidx.annotation.DrawableRes
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,10 +20,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -27,14 +31,20 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -45,14 +55,15 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.launch
 import ru.hideandseek.nychka.R
 import ru.hideandseek.nychka.hidespots.hideSpot
 import ru.hideandseek.nychka.hidespots.noHideZone
+import ru.hideandseek.nychka.ui.components.Art
 import ru.hideandseek.nychka.ui.components.KidsAvatar
 import ru.hideandseek.nychka.ui.components.SectionTitle
 import ru.hideandseek.nychka.ui.components.WideButton
-import ru.hideandseek.nychka.ui.components.glow
-import ru.hideandseek.nychka.ui.components.kidsCard
+import ru.hideandseek.nychka.ui.components.tappable
 import ru.hideandseek.nychka.ui.theme.KidsColors
 import ru.hideandseek.nychka.ui.theme.KidsType
 
@@ -68,12 +79,20 @@ fun MainScreen(modifier: Modifier = Modifier) {
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .drawBehind {
-                drawRect(KidsColors.Page)
+            .drawWithCache {
+                // Кисти создаются один раз на размер, а не на каждый кадр скролла
                 val w = size.width
-                glow(Offset(w * 0.5f, 330.dp.toPx()), 300.dp.toPx(), Color(0xFFEAFBAD))
-                glow(Offset(0f, 250.dp.toPx()), 210.dp.toPx(), Color(0xFFD3F9BC))
-                glow(Offset(w, 340.dp.toPx()), 190.dp.toPx(), Color(0xFFD2F7C2))
+                val glows = listOf(
+                    Triple(Offset(w * 0.5f, 330.dp.toPx()), 300.dp.toPx(), Color(0xFFEAFBAD)),
+                    Triple(Offset(0f, 250.dp.toPx()), 210.dp.toPx(), Color(0xFFD3F9BC)),
+                    Triple(Offset(w, 340.dp.toPx()), 190.dp.toPx(), Color(0xFFD2F7C2)),
+                ).map { (center, radius, color) ->
+                    Triple(center, radius, Brush.radialGradient(listOf(color, color.copy(alpha = 0f)), center, radius))
+                }
+                onDrawBehind {
+                    drawRect(KidsColors.Page)
+                    glows.forEach { (center, radius, brush) -> drawCircle(brush, radius, center) }
+                }
             }
             .statusBarsPadding(),
     ) {
@@ -92,8 +111,7 @@ fun MainScreen(modifier: Modifier = Modifier) {
             modifier = Modifier
                 .padding(horizontal = 16.dp)
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(17.dp))
-                .clickable { }
+                .tappable(RoundedCornerShape(17.dp))
                 .hideSpot("main.banner"),
         )
         Spacer(Modifier.height(18.dp))
@@ -112,14 +130,30 @@ fun MainScreen(modifier: Modifier = Modifier) {
 
 @Composable
 private fun CardWithBalance() {
+    val hop = remember { Animatable(0f) }
+    val scope = rememberCoroutineScope()
+    val haptics = LocalHapticFeedback.current
     Box(Modifier.fillMaxWidth().height(216.dp)) {
-        // Картинка карты смещена: передняя карта по центру, задняя выглядывает справа
+        // Передняя карта по центру, задняя выглядывает справа — поэтому картинка смещена.
+        // Тап по карте: карта подпрыгивает и пружинит обратно на место.
         Image(
             painter = painterResource(R.drawable.card_stack),
             contentDescription = "Карта",
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .offset(x = 26.dp)
+                .size(Art.CardStack)
+                .graphicsLayer {
+                    translationY = hop.value.dp.toPx()
+                    rotationZ = hop.value * 0.18f
+                }
+                .tappable(pressedScale = 0.95f, ripple = false, haptic = false) {
+                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                    scope.launch {
+                        hop.animateTo(-16f, tween(durationMillis = 120, easing = FastOutSlowInEasing))
+                        hop.animateTo(0f, spring(dampingRatio = 0.32f, stiffness = Spring.StiffnessLow))
+                    }
+                }
                 .hideSpot("main.card"),
         )
         BalancePlate(
@@ -135,7 +169,8 @@ private fun CardWithBalance() {
 private fun BalancePlate(modifier: Modifier = Modifier) {
     Row(
         modifier = modifier
-            .kidsCard(radius = 22.dp)
+            .tappable(RoundedCornerShape(22.dp), pressedScale = 0.98f)
+            .background(KidsColors.Card)
             .noHideZone("main.balance"),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -153,7 +188,7 @@ private fun BalancePlate(modifier: Modifier = Modifier) {
                 .padding(end = 8.dp)
                 .width(101.dp)
                 .height(55.dp)
-                .clip(RoundedCornerShape(16.dp))
+                .tappable(RoundedCornerShape(16.dp), pressedScale = 0.92f)
                 .background(KidsColors.Spasibo),
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically,
@@ -199,8 +234,8 @@ private fun ActionTile(
         Modifier
             .width(width)
             .height(120.dp)
-            .kidsCard(radius = 18.dp)
-            .clickable { }
+            .tappable(RoundedCornerShape(18.dp), pressedScale = 0.94f)
+            .background(KidsColors.Card)
             .noHideZone(spotId),
     ) {
         Text(
@@ -220,7 +255,7 @@ private fun ActionTile(
                 .size(48.dp),
             contentAlignment = Alignment.Center,
         ) {
-            Image(painterResource(icon), contentDescription = null, modifier = Modifier.wrapContentSize(unbounded = true))
+            Image(painterResource(icon), contentDescription = null, modifier = Modifier.requiredSize(Art.ActionIcon))
         }
     }
 }
@@ -240,13 +275,15 @@ private fun HistoryCard() {
         Operation(R.drawable.ic_hist_kuper, "Купер", "Супермаркет", "−4 686 ₽"),
         Operation(R.drawable.ic_hist_transfer, "Мария Валерьевна Р.", "Клиенту Сбера", "−500 ₽"),
     )
+    // Отступы поделены между карточкой и строками, чтобы у каждой строки была своя зона нажатия
     Column(
         modifier = Modifier
             .padding(horizontal = 16.dp)
             .fillMaxWidth()
-            .kidsCard(radius = 22.dp)
-            .padding(horizontal = 24.dp, vertical = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(32.dp),
+            .clip(RoundedCornerShape(22.dp))
+            .background(KidsColors.Card)
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         operations.forEachIndexed { i, op -> OperationRow(op, Modifier.noHideZone("main.history_${i + 1}")) }
     }
@@ -254,9 +291,15 @@ private fun HistoryCard() {
 
 @Composable
 private fun OperationRow(op: Operation, modifier: Modifier = Modifier) {
-    Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+    Row(
+        modifier
+            .fillMaxWidth()
+            .tappable(RoundedCornerShape(16.dp), pressedScale = 0.97f)
+            .padding(12.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
         Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
-            Image(painterResource(op.icon), contentDescription = null, modifier = Modifier.wrapContentSize(unbounded = true))
+            Image(painterResource(op.icon), contentDescription = null, modifier = Modifier.requiredSize(Art.HistoryIcon))
         }
         Spacer(Modifier.width(17.dp))
         Column(Modifier.weight(1f).padding(top = 4.dp)) {

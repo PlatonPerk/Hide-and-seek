@@ -3,7 +3,6 @@ package ru.hideandseek.nychka.ui.components
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -50,8 +49,7 @@ fun KidsAvatar(spotId: String, modifier: Modifier = Modifier) {
         contentDescription = "Профиль",
         modifier = modifier
             .size(56.dp)
-            .clip(CircleShape)
-            .clickable { }
+            .tappable(CircleShape, pressedScale = 0.9f)
             .hideSpot(spotId),
     )
 }
@@ -75,9 +73,8 @@ fun WideButton(
         modifier = modifier
             .fillMaxWidth()
             .height(height)
-            .clip(RoundedCornerShape(radius))
-            .background(color)
-            .clickable(onClick = onClick),
+            .tappable(RoundedCornerShape(radius), onClick = onClick)
+            .background(color),
         contentAlignment = Alignment.Center,
     ) {
         Text(text = text.nb(), style = KidsType.Button)
@@ -90,7 +87,7 @@ fun GradientButton(text: String, modifier: Modifier = Modifier, onClick: () -> U
         modifier = modifier
             .fillMaxWidth()
             .height(55.dp)
-            .clip(RoundedCornerShape(28.dp))
+            .tappable(RoundedCornerShape(28.dp), onClick = onClick)
             .background(
                 Brush.horizontalGradient(
                     listOf(
@@ -101,8 +98,7 @@ fun GradientButton(text: String, modifier: Modifier = Modifier, onClick: () -> U
                         Color(0xFFA5F65C),
                     ),
                 ),
-            )
-            .clickable(onClick = onClick),
+            ),
         contentAlignment = Alignment.Center,
     ) {
         Text(text = text, style = KidsType.Button)
@@ -161,6 +157,16 @@ fun PlayIcon(modifier: Modifier = Modifier, color: Color = KidsColors.TextTertia
             close()
         }
         drawPath(p, color)
+    }
+}
+
+@Composable
+fun PauseIcon(modifier: Modifier = Modifier, color: Color = KidsColors.TextPrimary, size: Dp = 16.dp) {
+    Canvas(modifier.size(size)) {
+        val w = this.size.width
+        val r = CornerRadius(w * 0.08f)
+        drawRoundRect(color, topLeft = Offset(w * 0.2f, w * 0.1f), size = Size(w * 0.2f, w * 0.8f), cornerRadius = r)
+        drawRoundRect(color, topLeft = Offset(w * 0.6f, w * 0.1f), size = Size(w * 0.2f, w * 0.8f), cornerRadius = r)
     }
 }
 

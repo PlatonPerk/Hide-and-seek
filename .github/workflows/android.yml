@@ -27,11 +27,11 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
-      - name: Build debug APK
+      - name: Build debug and release APK
         run: |
           chmod +x gradlew
           set -o pipefail
-          ./gradlew :app:assembleDebug --stacktrace 2>&1 | tee build.log
+          ./gradlew :app:assembleDebug :app:assembleRelease --stacktrace 2>&1 | tee build.log
 
       - name: Render screens (Roborazzi)
         run: |
@@ -42,8 +42,8 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: nychka-debug-apk
-          path: app/build/outputs/apk/debug/*.apk
+          name: nychka-apk
+          path: app/build/outputs/apk/*/*.apk
           if-no-files-found: ignore
 
       - name: Upload screenshots
@@ -62,6 +62,7 @@ jobs:
           cp build.log /tmp/out/ 2>/dev/null || true
           cp app/build/outputs/roborazzi/*.png /tmp/out/ 2>/dev/null || true
           cp app/build/outputs/apk/debug/*.apk /tmp/out/nychka-debug.apk 2>/dev/null || true
+          cp app/build/outputs/apk/release/*.apk /tmp/out/nychka-release.apk 2>/dev/null || true
           mkdir -p /tmp/out/test-reports
           cp -r app/build/reports/tests/* /tmp/out/test-reports/ 2>/dev/null || true
           echo "${GITHUB_SHA}" > /tmp/out/SHA

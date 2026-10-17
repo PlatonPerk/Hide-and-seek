@@ -3,7 +3,7 @@ package ru.hideandseek.nychka.ui.screens
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,12 +20,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -33,7 +34,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
-import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
@@ -49,6 +49,7 @@ import ru.hideandseek.nychka.ui.components.SectionTitle
 import ru.hideandseek.nychka.ui.components.WideButton
 import ru.hideandseek.nychka.ui.components.kidsCard
 import ru.hideandseek.nychka.ui.components.nb
+import ru.hideandseek.nychka.ui.components.tappable
 import ru.hideandseek.nychka.ui.theme.KidsColors
 import ru.hideandseek.nychka.ui.theme.KidsType
 
@@ -64,7 +65,17 @@ fun TasksScreen(modifier: Modifier = Modifier) {
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .drawBehind { drawTasksBackground() }
+            .drawWithCache {
+                // Кисти создаются один раз на размер, а не на каждый кадр скролла
+                val band = 380.dp.toPx()
+                val tint = Brush.horizontalGradient(listOf(Color(0xFFD2BDF6), Color(0xFFD1DAF7), Color(0xFFBCDEF9)))
+                val fade = Brush.verticalGradient(listOf(Color.Transparent, KidsColors.Page), startY = 0f, endY = band)
+                onDrawBehind {
+                    drawRect(KidsColors.Page)
+                    drawRect(brush = tint, size = Size(size.width, band))
+                    drawRect(brush = fade, size = Size(size.width, band))
+                }
+            }
             .statusBarsPadding(),
     ) {
         Row(
@@ -82,26 +93,13 @@ fun TasksScreen(modifier: Modifier = Modifier) {
     }
 }
 
-private fun DrawScope.drawTasksBackground() {
-    drawRect(KidsColors.Page)
-    val band = 380.dp.toPx()
-    drawRect(
-        brush = Brush.horizontalGradient(listOf(Color(0xFFD2BDF6), Color(0xFFD1DAF7), Color(0xFFBCDEF9))),
-        size = Size(size.width, band),
-    )
-    drawRect(
-        brush = Brush.verticalGradient(listOf(Color.Transparent, KidsColors.Page), startY = 0f, endY = band),
-        size = Size(size.width, band),
-    )
-}
-
 @Composable
 private fun PlusButton(modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
             .size(56.dp)
-            .kidsCard(radius = 15.dp)
-            .clickable { },
+            .tappable(RoundedCornerShape(15.dp), pressedScale = 0.9f)
+            .background(KidsColors.Card),
         contentAlignment = Alignment.Center,
     ) {
         Canvas(Modifier.size(22.dp)) {
@@ -219,8 +217,8 @@ private fun SchoolItem(modifier: Modifier = Modifier) {
         modifier = modifier
             .fillMaxWidth()
             .height(80.dp)
-            .kidsCard(KidsColors.ItemGrey, radius = 20.dp)
-            .clickable { }
+            .tappable(RoundedCornerShape(20.dp), pressedScale = 0.97f)
+            .background(KidsColors.ItemGrey)
             .padding(start = 24.dp, end = 26.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -234,8 +232,8 @@ private fun TaskTile(@DrawableRes image: Int, title: String, spotId: String) {
     Box(
         Modifier
             .size(width = 160.dp, height = 211.dp)
-            .kidsCard(radius = 19.dp)
-            .clickable { }
+            .tappable(RoundedCornerShape(19.dp), pressedScale = 0.95f)
+            .background(KidsColors.Card)
             .hideSpot(spotId),
     ) {
         Image(
