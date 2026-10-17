@@ -271,6 +271,40 @@ class FoxScreenshotTest {
         assertEquals("piggy.goal", controller.plan?.spot?.id)
     }
 
+    private fun scrollFeedUp(times: Int = 1, from: Float = 0.8f, to: Float = 0.3f) {
+        repeat(times) {
+            compose.onRoot().performTouchInput {
+                swipe(Offset(centerX, height * from), Offset(centerX, height * to), durationMillis = 300)
+            }
+            advance(600)
+        }
+    }
+
+    /** Лиса у верха, карточка под ней; при прокрутке карточка едет вверх вместе с экраном. */
+    @Test
+    fun cardFollowsScrollUp() {
+        show(Tab.Main, "main.card", "top", 0.75)
+        find()
+        advance(600)
+        val before = compose.onNodeWithText("Нашёл!").getUnclippedBoundsInRoot().top
+        scrollFeedUp(from = 0.75f, to = 0.55f)
+        val after = compose.onNodeWithText("Нашёл!").getUnclippedBoundsInRoot().top
+        assertTrue("карточка была на $before, стала на $after", after < before - 60.dp)
+        capture("30_card_follows_scroll")
+    }
+
+    /** Длинная лента (LazyColumn): место с лисой уехало из ленты, а карточка осталась наверху. */
+    @Test
+    fun cardStaysWhenFeedScrollsAway() {
+        show(Tab.Piggy, "piggy.pig", "left", 0.6)
+        find()
+        advance(600)
+        scrollFeedUp(times = 3)
+        compose.onNodeWithText("Нашёл!").assertExists()
+        val top = compose.onNodeWithText("Нашёл!").getUnclippedBoundsInRoot().top
+        assertTrue("карточка на $top", top < 100.dp)
+    }
+
     @Test
     fun celebrationDisappearsOnTabSwitch() {
         show(Tab.Main, "main.banner", "top", 0.85)
