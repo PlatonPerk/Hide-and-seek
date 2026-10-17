@@ -23,4 +23,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "HideAndSeek"
-include(":app")
+include(":app", ":hideandseek")

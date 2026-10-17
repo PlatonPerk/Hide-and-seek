@@ -50,6 +50,10 @@ app/src/main/java/ru/hideandseek/nychka/
   ui/theme/Theme.kt          цвета и типографика из макета
 app/src/main/res/drawable-hdpi/   иллюстрации, вырезанные из макета
 docs/mockups/                     склеенные макеты экранов (референс)
+hideandseek/                      модуль «Прятки»: библиотека, которую встраивают в СберKids
+  README.md                       как устроен модуль и как его встроить
+content/hideandseek.json          контент для CDN (GitHub Pages): места, веса, расписание, тексты
+app/src/main/assets/hideandseek/  копия контента внутри приложения на случай без сети
 ```
 
 ## Как это встраивается в настоящий СберKids
@@ -75,3 +79,10 @@ CompositionLocalProvider(LocalHideSpotRegistry provides registry) {
 Картинки вырезаны из скриншотов Figma в плотности hdpi (~1,5 px на dp). На телефоне они немного мягче оригинала.
 Чтобы стало чётче, экспортируйте их из Figma в @3x, положите в `res/drawable-xxhdpi/` с теми же именами
 и удалите файлы из `drawable-hdpi/`.
+
+## Модуль «Прятки»
+
+Логика и слой с персонажем живут в отдельном модуле `hideandseek` (подключён в `app` через
+`implementation(project(":hideandseek"))`). Подробности, формат контента и шаги встраивания —
+в [`hideandseek/README.md`](hideandseek/README.md).
+

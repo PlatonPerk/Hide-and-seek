@@ -59,6 +59,9 @@ android {
 }
 
 dependencies {
+    // Модуль «Прятки» (библиотека для встраивания)
+    implementation(project(":hideandseek"))
+
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.foundation)
