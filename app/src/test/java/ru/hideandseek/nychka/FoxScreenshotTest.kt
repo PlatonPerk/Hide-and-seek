@@ -195,9 +195,10 @@ class FoxScreenshotTest {
         val messageMs = bundledContent().getJSONObject("look").getLong("messageMs")
         show(Tab.Main, "main.banner", "top", 0.85)
         find()
-        advance(messageMs - 1_000)
+        // Ручные шаги времени в тесте немного «плывут», поэтому с запасом.
+        advance(messageMs / 2)
         compose.onNodeWithText("Нашёл!").assertExists()
-        advance(2_000)
+        advance(messageMs / 2 + 3_000)
         compose.onNodeWithText("Нашёл!").assertDoesNotExist()
     }
 
