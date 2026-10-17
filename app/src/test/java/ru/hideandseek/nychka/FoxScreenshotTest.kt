@@ -111,7 +111,7 @@ class FoxScreenshotTest {
         capture("24_fox_found")
         advance(500) // 0,7 с: первый прыжок
         capture("25_fox_celebrate")
-        advance(1_150) // 1,85 с: убегает
+        advance(900) // ~1,6 с плюс время на снимки: убегает (весь бег — 0,6 с)
         capture("26_fox_run")
     }
 }
