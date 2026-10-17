@@ -89,7 +89,13 @@ fun DevPanel(hideAndSeek: HideAndSeekController, onClose: () -> Unit, modifier: 
             }
         }
         Spacer(Modifier.height(8.dp))
-        DevButton("Сбросить все находки", Modifier.fillMaxWidth()) { hideAndSeek.resetAll() }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            DevButton(
+                if (hideAndSeek.demoRehide) "Перепрятка: вкл" else "Перепрятка: выкл",
+                Modifier.weight(1f),
+            ) { hideAndSeek.demoRehide = !hideAndSeek.demoRehide }
+            DevButton("Сбросить находки", Modifier.weight(1f)) { hideAndSeek.resetAll() }
+        }
     }
 }
 

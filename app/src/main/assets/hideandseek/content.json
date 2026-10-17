@@ -18,7 +18,7 @@
     "sizeDp": 56,
     "peek": 0.55,
     "appearDelayMs": 1200,
-    "messageMs": 6000
+    "messageMs": 4500
   },
 
   "creatures": [

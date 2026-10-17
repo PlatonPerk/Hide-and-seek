@@ -31,6 +31,7 @@ import app.hideandseek.core.DailyPlanner
 import app.hideandseek.core.Day
 import app.hideandseek.core.HideAndSeekContent
 import app.hideandseek.core.Progress
+import app.hideandseek.core.SpotDef
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -39,6 +40,7 @@ import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.TimeZone
+import kotlin.random.Random
 
 // =====================================================================================
 //  Public API — the whole integration is three calls:
@@ -206,8 +208,27 @@ class HideAndSeekController(
     var progress: Progress by mutableStateOf(Progress())
         private set
 
+    private var dayShiftState: Int by mutableIntStateOf(0)
+
     /** Demo time travel: shifts "today" by this many days. */
-    var dayShift: Int by mutableIntStateOf(0)
+    var dayShift: Int
+        get() = dayShiftState
+        set(value) {
+            dayShiftState = value
+            demoSpot = null
+        }
+
+    /**
+     * Режим демо (только для показа прототипа): после находки и закрытия карточки «Нашёл!»
+     * персонаж сразу прячется снова в другом месте, а не ждёт следующего дня.
+     * Предпочитает места, которые сейчас видны на экране.
+     */
+    var demoRehide: Boolean by mutableStateOf(false)
+
+    /** Режим демо: место, куда персонаж перепрятался после последней находки (null — место дня). */
+    private var demoSpot: SpotDef? by mutableStateOf(null)
+
+    private val demoRandom = Random(System.nanoTime())
 
     /** Called on the main thread when the kid finds today's creature (analytics hook). */
     var onFound: ((DailyPlan) -> Unit)? = null
@@ -222,7 +243,11 @@ class HideAndSeekController(
 
     internal val hour: Int get() = Day.hourAt(nowMillis, offsetMillis)
 
-    private val planState = derivedStateOf { content?.let { DailyPlanner.plan(it, today) } }
+    private val planState = derivedStateOf {
+        val base = content?.let { DailyPlanner.plan(it, today) }
+        val moved = demoSpot
+        if (base != null && moved != null) base.copy(spot = moved) else base
+    }
 
     /** Who hides today and where; null when nobody hides today. */
     val plan: DailyPlan? get() = planState.value
@@ -275,6 +300,7 @@ class HideAndSeekController(
         }
         withContext(Dispatchers.IO) { cache.write(json) }
         content = parsed
+        demoSpot = null
         contentOrigin = "сеть"
         lastError = null
         nowMillis = clock()
@@ -291,6 +317,24 @@ class HideAndSeekController(
         progress = progress.found(plan.day, plan.creature.id, DailyPlanner.previousHidingDay(current, plan.day))
         store.save(progress)
         onFound?.invoke(plan)
+    }
+
+    /**
+     * Вызывается слоем, когда карточка «Нашёл!» закрылась. В режиме демо персонаж
+     * перепрятывается в другое место: сначала среди мест, видимых на экране, иначе в любое.
+     */
+    internal fun afterFound() {
+        if (!demoRehide) return
+        val current = content ?: return
+        val now = plan ?: return
+        if (!progress.isFound(now.day)) return
+        val others = current.spotsOn(now.day).filter { it.id != now.spot.id }
+        if (others.isEmpty()) return
+        val onScreen = others.filter { registry.find(it.id)?.visibleBounds?.isEmpty == false }
+        val pool = onScreen.ifEmpty { others }
+        demoSpot = pool[demoRandom.nextInt(pool.size)]
+        progress = progress.copy(lastFoundDay = null)
+        store.save(progress)
     }
 
     /** Demo: let today's creature hide again. */

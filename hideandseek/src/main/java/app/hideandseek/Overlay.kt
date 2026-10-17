@@ -109,6 +109,7 @@ internal fun HideAndSeekOverlay(controller: HideAndSeekController, modifier: Mod
             key(current.id) {
                 CelebrationLayer(current) {
                     if (celebration?.id == current.id) celebration = null
+                    controller.afterFound() // режим демо: перепрятаться в другом месте
                 }
             }
         }
@@ -178,7 +179,12 @@ private fun PeekingCreature(
                 delay(900L)
                 peek.animateTo(look.peek, spring(dampingRatio = 0.45f, stiffness = 260f))
             }
+        } else if (registry.find(spot.id) == null) {
+            // Элемент ушёл с экрана (переключили вкладку): исчезаем сразу,
+            // а не прячемся в пустоту там, где только что был элемент.
+            peek.snapTo(0f)
         } else {
+            // Элемент на месте, но уехал при скролле или экран заблокирован: прячемся за него.
             peek.animateTo(0f, tween(durationMillis = 180))
         }
     }
@@ -195,7 +201,8 @@ private fun PeekingCreature(
         Modifier
             .fillMaxSize()
             .drawWithContent {
-                val a = anchor() ?: last.value ?: return@drawWithContent
+                // Нет элемента на экране — не рисуем (иначе персонаж мелькнёт на старом месте).
+                val a = anchor() ?: return@drawWithContent
                 val w = size.width
                 val h = size.height
                 when (spot.edge) {
