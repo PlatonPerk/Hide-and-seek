@@ -343,7 +343,9 @@ class HideAndSeekController(
 
     /**
      * Вызывается слоем, когда карточка «Нашёл!» закрылась. В режиме демо персонаж
-     * перепрятывается в другое место: сначала среди мест, видимых на экране, иначе в любое.
+     * перепрятывается на другом экране, чтобы искать его по всему приложению.
+     * Экран — часть id места до точки (`main`, `piggy`, `tasks`, `content`).
+     * Если других экранов в контенте нет — в любое другое место.
      */
     internal fun afterFound() {
         if (!demoRehide) return
@@ -352,13 +354,24 @@ class HideAndSeekController(
         if (!progress.isFound(now.day)) return
         val others = current.spotsOn(now.day).filter { it.id != now.spot.id }
         if (others.isEmpty()) return
-        val onScreen = others.filter { registry.find(it.id)?.visibleBounds?.isEmpty == false }
-        val pool = onScreen.ifEmpty { others }
-        demoSpot = pool[demoRandom.nextInt(pool.size)]
+        val screen = screenOf(now.spot.id)
+        val pool = others.filter { screenOf(it.id) != screen }.ifEmpty { others }
+        demoSpot = pickWeighted(pool)
         val tips = current.tipsOn(now.day).map { it.text }.filter { it != now.tip }
         demoTip = if (tips.isEmpty()) now.tip else tips[demoRandom.nextInt(tips.size)]
         progress = progress.copy(lastFoundDay = null)
         store.save(progress)
+    }
+
+    private fun screenOf(spotId: String): String = spotId.substringBefore('.')
+
+    private fun pickWeighted(spots: List<SpotDef>): SpotDef {
+        var r = demoRandom.nextInt(spots.sumOf { it.weight.coerceAtLeast(1) })
+        for (spot in spots) {
+            r -= spot.weight.coerceAtLeast(1)
+            if (r < 0) return spot
+        }
+        return spots.last()
     }
 
     /** Demo: let today's creature hide again. */

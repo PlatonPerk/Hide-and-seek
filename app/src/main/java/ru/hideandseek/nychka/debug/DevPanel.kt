@@ -71,7 +71,10 @@ fun DevPanel(hideAndSeek: HideAndSeekController, onClose: () -> Unit, modifier: 
             "Сегодня",
             hideAndSeek.today.toString() + if (shift != 0) "  (сдвиг ${if (shift > 0) "+" else ""}$shift)" else "",
         )
-        DevLine("Прячется", plan?.let { "${it.creature.name} → ${it.spot.id}" } ?: "сегодня никто не прячется")
+        DevLine(
+            "Прячется",
+            plan?.let { "${it.creature.name} → ${screenName(it.spot.id)} (${it.spot.id})" } ?: "сегодня никто не прячется",
+        )
         DevLine("Найден", if (hideAndSeek.isFoundToday) "да" else "нет")
         DevLine("Контент", content?.let { "v${it.version}, ${hideAndSeek.contentOrigin}" } ?: "загружается…")
         DevLine("Находок", "${progress.totalFound}, серия ${progress.streak}, коллекция ${progress.collection.size}")
@@ -97,6 +100,15 @@ fun DevPanel(hideAndSeek: HideAndSeekController, onClose: () -> Unit, modifier: 
             DevButton("Сбросить находки", Modifier.weight(1f)) { hideAndSeek.resetAll() }
         }
     }
+}
+
+/** Вкладка по началу id места (main.banner → «Главный»). */
+private fun screenName(spotId: String): String = when (spotId.substringBefore('.')) {
+    "main" -> "«Главный»"
+    "piggy" -> "«Копилки»"
+    "tasks" -> "«Дела»"
+    "content" -> "«Контент»"
+    else -> spotId.substringBefore('.')
 }
 
 @Composable
