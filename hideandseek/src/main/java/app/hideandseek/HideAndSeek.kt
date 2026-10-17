@@ -21,6 +21,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.changedToDown
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
@@ -83,10 +86,24 @@ fun HideAndSeekHost(
             controller.tick() // day rollover at midnight, active hours
         }
     }
+    val touches = remember(controller) { OverlayTouches() }
     CompositionLocalProvider(LocalHideAndSeek provides controller) {
-        Box(modifier) {
+        Box(
+            modifier.pointerInput(touches) {
+                // Только смотрим на касания, ничего не забирая у приложения: касание мимо
+                // карточки «Нашёл!» (тап, начало прокрутки, смена вкладки) её закрывает.
+                awaitPointerEventScope {
+                    while (true) {
+                        val event = awaitPointerEvent(PointerEventPass.Initial)
+                        for (change in event.changes) {
+                            if (change.changedToDown()) touches.press(change.position)
+                        }
+                    }
+                }
+            },
+        ) {
             content()
-            HideAndSeekOverlay(controller, Modifier.matchParentSize())
+            HideAndSeekOverlay(controller, touches, Modifier.matchParentSize())
         }
     }
 }
@@ -216,6 +233,7 @@ class HideAndSeekController(
         set(value) {
             dayShiftState = value
             demoSpot = null
+            demoTip = null
         }
 
     /**
@@ -227,6 +245,9 @@ class HideAndSeekController(
 
     /** Режим демо: место, куда персонаж перепрятался после последней находки (null — место дня). */
     private var demoSpot: SpotDef? by mutableStateOf(null)
+
+    /** Режим демо: совет для следующей находки — каждый раз другой, а не один на весь день. */
+    private var demoTip: String? by mutableStateOf(null)
 
     private val demoRandom = Random(System.nanoTime())
 
@@ -246,7 +267,7 @@ class HideAndSeekController(
     private val planState = derivedStateOf {
         val base = content?.let { DailyPlanner.plan(it, today) }
         val moved = demoSpot
-        if (base != null && moved != null) base.copy(spot = moved) else base
+        if (base != null && moved != null) base.copy(spot = moved, tip = demoTip ?: base.tip) else base
     }
 
     /** Who hides today and where; null when nobody hides today. */
@@ -301,6 +322,7 @@ class HideAndSeekController(
         withContext(Dispatchers.IO) { cache.write(json) }
         content = parsed
         demoSpot = null
+        demoTip = null
         contentOrigin = "сеть"
         lastError = null
         nowMillis = clock()
@@ -333,6 +355,8 @@ class HideAndSeekController(
         val onScreen = others.filter { registry.find(it.id)?.visibleBounds?.isEmpty == false }
         val pool = onScreen.ifEmpty { others }
         demoSpot = pool[demoRandom.nextInt(pool.size)]
+        val tips = current.tipsOn(now.day).map { it.text }.filter { it != now.tip }
+        demoTip = if (tips.isEmpty()) now.tip else tips[demoRandom.nextInt(tips.size)]
         progress = progress.copy(lastFoundDay = null)
         store.save(progress)
     }
