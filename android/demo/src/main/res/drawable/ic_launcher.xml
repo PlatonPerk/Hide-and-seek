@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Simple launcher icon: an orange creature peeking over a blue edge. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <path android:fillColor="#3B5BFD" android:pathData="M8,0h32a8,8 0,0 1,8 8v32a8,8 0,0 1,-8 8h-32a8,8 0,0 1,-8 -8v-32a8,8 0,0 1,8 -8z" />
+    <path android:fillColor="#FF8A3D" android:pathData="M12,22 L14,9 L22,15 Z" />
+    <path android:fillColor="#FF8A3D" android:pathData="M36,22 L34,9 L26,15 Z" />
+    <path android:fillColor="#FF8A3D" android:pathData="M10,32 L10,26 A14,12 0,0 1,38 26 L38,32 Z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M15.5,24a3.5,4 0,1 0,7 0a3.5,4 0,1 0,-7 0z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M25.5,24a3.5,4 0,1 0,7 0a3.5,4 0,1 0,-7 0z" />
+    <path android:fillColor="#2A2333" android:pathData="M17.5,25a1.8,1.8 0,1 0,3.6 0a1.8,1.8 0,1 0,-3.6 0z" />
+    <path android:fillColor="#2A2333" android:pathData="M27.5,25a1.8,1.8 0,1 0,3.6 0a1.8,1.8 0,1 0,-3.6 0z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M6,32h36v10h-36z" />
+    <path android:fillColor="#E8662B" android:pathData="M11,30.5h6v3h-6z" />
+    <path android:fillColor="#E8662B" android:pathData="M31,30.5h6v3h-6z" />
+</vector>

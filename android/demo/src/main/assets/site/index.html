@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Сайт-имитация приложения</title>
+  <style>
+    :root { --bg: #f3f5fb; --ink: #1f2430; --soft: #6b7385; --primary: #3b5bfd; --accent: #14b87f; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--ink); font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+    .page { padding: 16px 16px 40px; }
+    .note { font-size: 12px; color: var(--soft); background: #fff; border-radius: 12px; padding: 10px 12px; margin-bottom: 14px; }
+    .tabs { display: flex; gap: 8px; margin-bottom: 18px; }
+    .tabs a { flex: 1; text-align: center; padding: 10px; border-radius: 12px; background: #fff; color: var(--ink); text-decoration: none; font-weight: 600; font-size: 14px; }
+    .tabs a.on { background: var(--ink); color: #fff; }
+    h1 { font-size: 22px; margin: 0 0 4px; }
+    .sub { color: var(--soft); font-size: 13px; margin: 0; }
+    .gap { height: 30px; }
+    .balance { border-radius: 24px; padding: 20px; color: #fff; background: linear-gradient(135deg, var(--primary), #7c4dff); }
+    .balance .label { opacity: .8; font-size: 14px; }
+    .balance .sum { font-size: 34px; font-weight: 700; margin: 6px 0 16px; }
+    .balance .row { display: flex; justify-content: space-between; font-size: 14px; }
+    .actions { display: flex; justify-content: space-between; }
+    .action { width: 76px; text-align: center; font-size: 12px; color: var(--ink); text-decoration: none; }
+    .action .icon { width: 52px; height: 52px; margin: 0 auto 6px; border-radius: 16px; background: #fff; display: grid; place-items: center; font-size: 24px; }
+    .card { background: #fff; border-radius: 20px; padding: 16px; margin-bottom: 16px; }
+    .goal-top { display: flex; align-items: center; gap: 12px; }
+    .bar { height: 8px; border-radius: 4px; background: #e8ecf8; margin-top: 12px; overflow: hidden; }
+    .bar i { display: block; height: 100%; width: 42%; background: var(--accent); }
+    .task { display: flex; gap: 10px; padding: 8px 0; font-size: 15px; }
+    .task b { margin-left: auto; color: var(--accent); }
+    .lesson { display: flex; gap: 14px; align-items: center; }
+    .lesson .icon { width: 52px; height: 52px; border-radius: 16px; background: #eff2ff; display: grid; place-items: center; font-size: 26px; }
+    label { display: block; font-size: 13px; color: var(--soft); margin: 14px 0 6px; }
+    input { width: 100%; padding: 14px; border-radius: 14px; border: 1px solid #d6dbea; font-size: 16px; }
+    button { width: 100%; margin-top: 24px; padding: 16px; border: 0; border-radius: 16px; background: var(--primary); color: #fff; font-size: 16px; }
+    section { display: none; }
+    section.on { display: block; }
+  </style>
+</head>
+<body>
+<div class="page">
+  <div class="note">Это сайт внутри WebView. Прятунчик — нативный слой поверх него, логика та же, что на нативных экранах.</div>
+
+  <nav class="tabs">
+    <a href="#home" id="tab-home">Главная</a>
+    <a href="#lessons" id="tab-lessons">Уроки</a>
+  </nav>
+
+  <!-- HOME: spots are marked with data-hide-spot; the goal card is found by the CSS selector from the JSON ("web": ".goal-card"). -->
+  <section id="home">
+    <h1>Привет, Саша!</h1>
+    <p class="sub">Кто-то спрятался на сайте 👀</p>
+    <div class="gap"></div>
+
+    <div class="balance" data-hide-spot="home.balance">
+      <div class="label">Мой баланс</div>
+      <div class="sum">1 250 ₽</div>
+      <div class="row"><span>Карта •• 4417</span><b>Кешбэк 37 ₽</b></div>
+    </div>
+    <div class="gap"></div>
+
+    <div class="actions" data-hide-spot="home.actions">
+      <a class="action" href="#transfer"><div class="icon">💸</div>Перевести</a>
+      <a class="action" href="#transfer"><div class="icon">➕</div>Пополнить</a>
+      <a class="action" href="#home"><div class="icon">🐷</div>Копилка</a>
+      <a class="action" href="#home"><div class="icon">🎁</div>Бонусы</a>
+    </div>
+    <div class="gap"></div>
+
+    <div class="card goal-card">
+      <div class="goal-top"><span style="font-size:28px">🛴</span><div><b>Копилка на самокат</b><br><small>3 400 из 8 000 ₽</small></div></div>
+      <div class="bar"><i></i></div>
+    </div>
+
+    <div class="card" data-hide-spot="home.tasks">
+      <b>Задания от родителей</b>
+      <div class="task">✅ Убрать в комнате <b>+100 ₽</b></div>
+      <div class="task">⬜ Прочитать 20 страниц <b>+50 ₽</b></div>
+      <div class="task">⬜ Помочь с покупками <b>+70 ₽</b></div>
+    </div>
+  </section>
+
+  <section id="lessons">
+    <h1>Уроки</h1>
+    <p class="sub">Пройди урок — получи звёздочку ⭐</p>
+    <div class="gap"></div>
+    <div class="card lesson" data-hide-spot="lessons.card"><div class="icon">💰</div><div><b>Откуда берутся деньги</b><br><small>5 минут · 3 вопроса</small></div></div>
+    <div class="card lesson"><div class="icon">💳</div><div><b>Как работает банковская карта</b><br><small>7 минут · 4 вопроса</small></div></div>
+    <div class="card lesson"><div class="icon">🛡️</div><div><b>Как не попасться мошенникам</b><br><small>6 минут · 5 вопросов</small></div></div>
+  </section>
+
+  <!-- A protected screen: data-hide-seek-block hides the creature while this is visible. -->
+  <section id="transfer">
+    <div data-hide-seek-block>
+      <h1>Перевод</h1>
+      <p class="sub">Экраны оплаты защищены: здесь прятунчик не появляется.</p>
+      <label>Кому: номер телефона</label><input type="tel" placeholder="+7">
+      <label>Сумма, ₽</label><input type="number" placeholder="0">
+      <button onclick="location.hash='#home'">Перевести</button>
+    </div>
+  </section>
+</div>
+
+<script>
+  // Minimal hash router, like a single-page app.
+  function show() {
+    var id = (location.hash || '#home').slice(1);
+    if (!document.getElementById(id)) id = 'home';
+    document.querySelectorAll('section').forEach(function (s) { s.classList.toggle('on', s.id === id); });
+    document.querySelectorAll('.tabs a').forEach(function (a) { a.classList.toggle('on', a.id === 'tab-' + id); });
+    window.scrollTo(0, 0);
+  }
+  window.addEventListener('hashchange', show);
+  show();
+</script>
+</body>
+</html>

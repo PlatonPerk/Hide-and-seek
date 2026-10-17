@@ -1,0 +1,62 @@
+{
+  "version": 1,
+  "enabled": true,
+  "timeZone": "Europe/Moscow",
+  "salt": "pryatunchiki-2026",
+
+  "schedule": {
+    "startDate": "2026-10-01",
+    "endDate": "2027-08-31",
+    "daysOfWeek": [1, 2, 3, 4, 5, 6, 7],
+    "everyNDays": 1,
+    "chancePercent": 100,
+    "hours": { "from": 0, "to": 24 },
+    "avoidRepeat": true
+  },
+
+  "look": {
+    "sizeDp": 56,
+    "peek": 0.55,
+    "appearDelayMs": 1200,
+    "messageMs": 6000
+  },
+
+  "creatures": [
+    { "id": "ryzhik",     "name": "Рыжик",    "color": "#FF8A3D", "weight": 10 },
+    { "id": "chernichka", "name": "Черничка", "color": "#7C6CF2", "weight": 8 },
+    { "id": "myatik",     "name": "Мятик",    "color": "#2EC4A0", "weight": 8 },
+    { "id": "zolotik",    "name": "Золотик",  "color": "#FFC23D", "weight": 1, "rare": true },
+    { "id": "snezhok",    "name": "Снежок",   "color": "#8FD3FF", "weight": 12, "from": "2026-12-15", "to": "2027-01-15" }
+  ],
+
+  "spots": [
+    { "id": "home.balance", "edge": "top",    "align": 0.82, "weight": 3 },
+    { "id": "home.actions", "edge": "top",    "align": 0.5,  "weight": 2 },
+    { "id": "home.goal",    "edge": "top",    "align": 0.15, "weight": 2, "web": ".goal-card" },
+    { "id": "home.tasks",   "edge": "bottom", "align": 0.7,  "weight": 2 },
+    { "id": "lessons.card", "edge": "top",    "align": 0.85, "weight": 2 },
+    { "id": "nav.bar",      "edge": "top",    "align": 0.3,  "weight": 1 }
+  ],
+
+  "tips": [
+    "Откладывай понемногу с каждых карманных — копилка растёт быстрее, чем кажется.",
+    "Хочешь что-то купить? Подожди один день. Если всё ещё хочется — значит, правда нужно.",
+    "Кешбэк — это часть денег, которая возвращается тебе после покупки.",
+    "Никому не называй код из СМС, даже если звонят «из банка». Настоящий банк его не спрашивает.",
+    "Поставь цель в копилке: копить на что-то конкретное намного легче.",
+    "Сравни цены в двух местах — одна и та же вещь часто стоит по-разному.",
+    { "text": "Подарочные деньги на Новый год — отличный старт для копилки.", "from": "2026-12-15", "to": "2027-01-15" }
+  ],
+
+  "specialDays": [
+    { "date": "2026-12-31", "creature": "snezhok", "spot": "home.balance", "tip": "С наступающим! Подумай, на что будешь копить в новом году." }
+  ],
+
+  "texts": {
+    "foundTitle": "Нашёл!",
+    "foundBody": "{name} прятался именно здесь. Завтра спрячется в другом месте.",
+    "streak": "Ты находишь меня {streakDays} подряд!",
+    "tipTitle": "Совет дня",
+    "accessibilityLabel": "Здесь кто-то прячется. Нажми, чтобы найти"
+  }
+}
