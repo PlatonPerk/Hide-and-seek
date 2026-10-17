@@ -142,6 +142,74 @@ class CoreTest {
         assertEquals("snezhok", newYear.creature.id)
     }
 
+    // ---- Sprites ----
+
+    @Test
+    fun spritesParseWithAnchorsSizesAndBlink() {
+        val parsed = ContentParser.parse(
+            """
+            {
+              "creatures": [
+                { "id": "fox", "sprites": {
+                    "peek": { "image": "asset:fox/peek.webp", "blink": "asset:fox/peek_blink.webp",
+                              "heightDp": 64, "anchor": [0.356, 0.941] },
+                    "side": { "image": "asset:fox/side.webp", "anchor": [0.081, 0.73] },
+                    "found": "https://cdn.example/fox/found.webp",
+                    "run": { "image": "asset:fox/run.webp", "heightDp": 9999 }
+                } },
+                { "id": "copy", "spritesFrom": "fox" },
+                { "id": "own", "spritesFrom": "fox", "sprites": { "peek": "asset:own.webp" } }
+              ]
+            }
+            """.trimIndent(),
+        )
+        val fox = parsed.creature("fox")!!.sprites!!
+        assertEquals(PoseDef("asset:fox/peek.webp", "asset:fox/peek_blink.webp", 64, 0.356f, 0.941f), fox.peek)
+        assertEquals(76, fox.side!!.heightDp) // размер по умолчанию для боковой позы
+        assertEquals(0.081f, fox.side!!.anchorX)
+        assertNull(fox.side!!.blink)
+        assertEquals("https://cdn.example/fox/found.webp", fox.found!!.image)
+        assertEquals(0.5f, fox.found!!.anchorX) // поза во весь рост: по умолчанию ноги по центру снизу
+        assertEquals(1f, fox.found!!.anchorY)
+        assertEquals(240, fox.run!!.heightDp) // ограничено сверху
+        assertNull(fox.celebrate)
+        assertEquals(5, fox.urls.size)
+        assertEquals(fox, parsed.creature("copy")!!.sprites)
+        assertEquals("asset:own.webp", parsed.creature("own")!!.sprites!!.peek!!.image)
+        assertNull(parsed.creature("own")!!.sprites!!.side)
+    }
+
+    @Test
+    fun brokenSpritesAreIgnored() {
+        val parsed = ContentParser.parse(
+            """
+            {
+              "creatures": [
+                { "id": "a", "image": "asset:old.png", "sprites": "peek.webp" },
+                { "id": "b", "sprites": {} },
+                { "id": "c", "sprites": { "peek": 42, "side": { "anchor": [0.1, 0.2] }, "run": "  " } },
+                { "id": "d", "sprites": { "peek": { "image": "p.webp", "anchor": [2, -1] },
+                                          "side": { "image": "s.webp", "anchor": [0.5] },
+                                          "found": { "image": "f.webp", "anchor": "center", "heightDp": "big" } } },
+                { "id": "e", "spritesFrom": "nobody" }
+              ]
+            }
+            """.trimIndent(),
+        )
+        assertEquals(5, parsed.creatures.size)
+        assertEquals("asset:old.png", parsed.creature("a")!!.imageUrl) // старое поле image остаётся запасным
+        assertNull(parsed.creature("a")!!.sprites)
+        assertNull(parsed.creature("b")!!.sprites)
+        assertNull(parsed.creature("c")!!.sprites)
+        val d = parsed.creature("d")!!.sprites!!
+        assertEquals(0.5f, d.peek!!.anchorX) // якорь вне 0..1 — берётся по умолчанию
+        assertEquals(1f, d.peek!!.anchorY)
+        assertEquals(0f, d.side!!.anchorX)
+        assertEquals(0.5f, d.side!!.anchorY)
+        assertEquals(110, d.found!!.heightDp)
+        assertNull(parsed.creature("e")!!.sprites)
+    }
+
     // ---- Planner ----
 
     @Test

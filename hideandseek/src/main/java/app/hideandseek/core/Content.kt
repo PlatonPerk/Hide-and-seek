@@ -35,7 +35,51 @@ data class CreatureDef(
     /** Rare creatures sparkle; give them a small weight. */
     val rare: Boolean = false,
     val window: DateWindow = DateWindow.Always,
+    /** Позы-картинки (лиса Нычка). Если их нет или они не загрузились — работает [imageUrl] или рисунок кодом. */
+    val sprites: CreatureSprites? = null,
 )
+
+/**
+ * Одна поза-картинка.
+ * [anchorX]/[anchorY] — точка картинки в долях ширины и высоты, которая совмещается с краем элемента
+ * (для поз «выглядывает») или стоит на «земле» (ноги — для поз во весь рост).
+ * [heightDp] — высота картинки на экране; ширина берётся из пропорций картинки.
+ */
+data class PoseDef(
+    val image: String,
+    /** Тот же кадр с закрытыми глазами, совпадает с [image] до пикселя. */
+    val blink: String? = null,
+    val heightDp: Int,
+    val anchorX: Float,
+    val anchorY: Float,
+)
+
+/**
+ * Набор поз. Любая может отсутствовать:
+ * [peek] — выглядывает из-за верхнего края, [side] — из-за правого края (для левого зеркалится),
+ * [found] — «ой, нашли!», [celebrate] — радуется, [run] — убегает вправо (влево зеркалится).
+ */
+data class CreatureSprites(
+    val peek: PoseDef? = null,
+    val side: PoseDef? = null,
+    val found: PoseDef? = null,
+    val celebrate: PoseDef? = null,
+    val run: PoseDef? = null,
+) {
+    /** Все адреса картинок (для предзагрузки). */
+    val urls: List<String>
+        get() = listOfNotNull(peek, side, found, celebrate, run)
+            .flatMap { listOfNotNull(it.image, it.blink) }
+            .distinct()
+
+    enum class Kind(val key: String, val defaultHeightDp: Int, val defaultAnchorX: Float, val defaultAnchorY: Float) {
+        PEEK("peek", 60, 0.5f, 1f),
+        SIDE("side", 76, 0f, 0.5f),
+        FOUND("found", 110, 0.5f, 1f),
+        CELEBRATE("celebrate", 110, 0.5f, 1f),
+        RUN("run", 110, 0.5f, 1f),
+    }
+}
 
 data class SpotDef(
     /** Must match `Modifier.hidingSpot("…")` in the app or `data-hide-spot="…"` on the website. */
@@ -181,7 +225,7 @@ object ContentParser {
                 messageMs = (look.number("messageMs")?.toLong() ?: defaultLook.messageMs)
                     .coerceIn(1_500L, 30_000L),
             ),
-            creatures = root.objects("creatures").mapNotNull(::parseCreature),
+            creatures = parseCreatures(root.objects("creatures")),
             spots = root.objects("spots").mapNotNull(::parseSpot),
             tips = root.array("tips").mapNotNull(::parseTip),
             specialDays = root.objects("specialDays").mapNotNull(::parseSpecialDay),
@@ -208,6 +252,15 @@ object ContentParser {
 
     private fun window(o: Map<String, Any?>) = DateWindow(Day.parse(o.string("from")), Day.parse(o.string("to")))
 
+    /** "spritesFrom": "nychka" — взять позы у другого зверька, чтобы не повторять их в JSON. */
+    private fun parseCreatures(items: List<Map<String, Any?>>): List<CreatureDef> {
+        val parsed = items.mapNotNull { o -> parseCreature(o)?.let { it to o.string("spritesFrom") } }
+        val byId = parsed.associate { it.first.id to it.first }
+        return parsed.map { (creature, from) ->
+            if (creature.sprites == null && from != null) creature.copy(sprites = byId[from]?.sprites) else creature
+        }
+    }
+
     private fun parseCreature(o: Map<String, Any?>): CreatureDef? {
         val id = o.string("id") ?: return null
         return CreatureDef(
@@ -218,6 +271,40 @@ object ContentParser {
             weight = o.int("weight") ?: 1,
             rare = o.boolean("rare") ?: false,
             window = window(o),
+            sprites = parseSprites(o["sprites"]),
+        )
+    }
+
+    /** Битые или пустые позы не роняют разбор: такая поза просто пропускается. */
+    internal fun parseSprites(value: Any?): CreatureSprites? {
+        val o = value.asObject() ?: return null
+        fun pose(kind: CreatureSprites.Kind) = parsePose(o[kind.key], kind)
+        val sprites = CreatureSprites(
+            peek = pose(CreatureSprites.Kind.PEEK),
+            side = pose(CreatureSprites.Kind.SIDE),
+            found = pose(CreatureSprites.Kind.FOUND),
+            celebrate = pose(CreatureSprites.Kind.CELEBRATE),
+            run = pose(CreatureSprites.Kind.RUN),
+        )
+        return sprites.takeIf { it.urls.isNotEmpty() }
+    }
+
+    /** Поза — строка с адресом картинки или объект { image, blink, heightDp, anchor: [x, y] }. */
+    private fun parsePose(value: Any?, kind: CreatureSprites.Kind): PoseDef? {
+        if (value is String) {
+            val image = value.trim().takeIf { it.isNotEmpty() } ?: return null
+            return PoseDef(image, null, kind.defaultHeightDp, kind.defaultAnchorX, kind.defaultAnchorY)
+        }
+        val o = value.asObject() ?: return null
+        val image = o.string("image") ?: return null
+        val anchor = o.array("anchor").mapNotNull { (it as? Number)?.toFloat() }
+        val valid = anchor.size == 2 && anchor.all { it in 0f..1f }
+        return PoseDef(
+            image = image,
+            blink = o.string("blink"),
+            heightDp = (o.int("heightDp") ?: kind.defaultHeightDp).coerceIn(24, 240),
+            anchorX = if (valid) anchor[0] else kind.defaultAnchorX,
+            anchorY = if (valid) anchor[1] else kind.defaultAnchorY,
         )
     }
 
