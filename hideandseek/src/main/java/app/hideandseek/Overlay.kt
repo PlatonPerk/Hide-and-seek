@@ -8,6 +8,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,14 +26,18 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
@@ -49,6 +54,8 @@ import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
@@ -69,6 +76,7 @@ import app.hideandseek.core.HideAndSeekContent
 import app.hideandseek.core.SpotDef
 import app.hideandseek.core.TextTemplate
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
@@ -94,7 +102,7 @@ private const val FOX_TOTAL_MS = FOX_FOUND_MS + 2 * FOX_JUMP_MS + FOX_RUN_MS
  * through to the screen underneath.
  */
 @Composable
-internal fun HideAndSeekOverlay(controller: HideAndSeekController, modifier: Modifier) {
+internal fun HideAndSeekOverlay(controller: HideAndSeekController, touches: OverlayTouches, modifier: Modifier) {
     val content = controller.content
     val plan = controller.plan
     val frame = remember { OverlayFrame() }
@@ -118,7 +126,21 @@ internal fun HideAndSeekOverlay(controller: HideAndSeekController, modifier: Mod
         val current = celebration
         if (current != null && !blocked) {
             key(current.id) {
-                CelebrationLayer(current) {
+                CelebrationLayer(
+                    c = current,
+                    // Лиса и звёздочки привязаны к элементу: едут вместе с ним при прокрутке
+                    // и пропадают, если элемент ушёл с экрана (переключили вкладку).
+                    anchorNow = {
+                        val offset = current.elementOffset
+                        if (offset == null) {
+                            current.anchor
+                        } else {
+                            controller.registry.find(current.spotId)?.let { it.bounds.topLeft + offset - frame.origin }
+                        }
+                    },
+                    touches = touches,
+                    frame = frame,
+                ) {
                     if (celebration?.id == current.id) celebration = null
                     controller.afterFound() // режим демо: перепрятаться в другом месте
                 }
@@ -140,6 +162,22 @@ internal class OverlayFrame {
 
 private class LastAnchor {
     var value: Offset? = null
+}
+
+/** Касания экрана для карточки «Нашёл!»: она закрывается касанием мимо неё. */
+@Stable
+internal class OverlayTouches {
+    /** Где сейчас карточка, в координатах слоя; null — карточки нет. */
+    var card: Rect? = null
+
+    /** Сколько раз коснулись экрана мимо карточки. */
+    var outsidePresses by mutableIntStateOf(0)
+        private set
+
+    fun press(position: Offset) {
+        val bounds = card ?: return
+        if (!bounds.contains(position)) outsidePresses++
+    }
 }
 
 @Composable
@@ -300,6 +338,8 @@ private fun PeekingCreature(
                 role = Role.Button,
             ) {
                 val a = last.value ?: return@clickable
+                // Точка относительно элемента: по ней выход лисы следует за элементом при прокрутке.
+                val elementOffset = registry.find(spot.id)?.let { a + frame.origin - it.bounds.topLeft }
                 haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                 controller.markFound(plan)
                 onFound(
@@ -308,6 +348,7 @@ private fun PeekingCreature(
                         poses = loaded,
                         byPose = pose != null,
                         shape = shape,
+                        elementOffset = elementOffset,
                     ),
                 )
             },
@@ -392,7 +433,11 @@ internal fun Edge.outward(): Offset = when (this) {
 internal class Celebration(
     val id: Long,
     val creature: CreatureDef,
+    /** Точка на краю элемента в момент находки, в координатах слоя. */
     val anchor: Offset,
+    val spotId: String,
+    /** Та же точка относительно левого верхнего угла элемента; null — не следить за элементом. */
+    val elementOffset: Offset?,
     val edge: Edge,
     val sizePx: Float,
     val startPeek: Float,
@@ -422,6 +467,7 @@ private fun celebrationFor(
     poses: LoadedSprites?,
     byPose: Boolean,
     shape: HideShape,
+    elementOffset: Offset?,
 ): Celebration {
     val progress = controller.progress
     val values = mapOf(
@@ -435,6 +481,8 @@ private fun celebrationFor(
         id = System.nanoTime(),
         creature = plan.creature,
         anchor = anchor,
+        spotId = plan.spot.id,
+        elementOffset = elementOffset,
         edge = plan.spot.edge,
         sizePx = sizePx,
         startPeek = peekNow,
@@ -485,18 +533,39 @@ private fun makeParticles(seed: Long, edge: Edge, base: Color, rare: Boolean): L
 }
 
 @Composable
-private fun CelebrationLayer(c: Celebration, onFinished: () -> Unit) {
+private fun CelebrationLayer(
+    c: Celebration,
+    anchorNow: () -> Offset?,
+    touches: OverlayTouches,
+    frame: OverlayFrame,
+    onFinished: () -> Unit,
+) {
     val burst = remember { Animatable(0f) }
     val fox = remember { Animatable(if (c.poses != null) 0f else 1f) }
     val card = remember { Animatable(0f) }
     var cardVisible by remember { mutableStateOf(true) }
     val particles = remember(c.id) { makeParticles(c.id, c.edge, Color(c.creature.color), c.creature.rare) }
+    val pressesAtStart = remember { touches.outsidePresses }
 
     LaunchedEffect(Unit) {
         burst.animateTo(1f, tween(durationMillis = 1300, easing = LinearEasing))
     }
     LaunchedEffect(Unit) {
         fox.animateTo(1f, tween(durationMillis = FOX_TOTAL_MS, easing = LinearEasing))
+    }
+    // Элемент ушёл с экрана (переключили вкладку) — лиса и звёздочки сразу исчезают, а не висят посреди экрана.
+    LaunchedEffect(Unit) {
+        snapshotFlow { anchorNow() == null }.first { it }
+        burst.snapTo(1f)
+        fox.snapTo(1f)
+    }
+    // Касание мимо карточки (тап, прокрутка, другая вкладка) закрывает её. Касание по карточке — ничего.
+    LaunchedEffect(Unit) {
+        snapshotFlow { touches.outsidePresses }.first { it != pressesAtStart }
+        cardVisible = false
+    }
+    DisposableEffect(Unit) {
+        onDispose { touches.card = null }
     }
     LaunchedEffect(cardVisible) {
         if (cardVisible) {
@@ -512,23 +581,31 @@ private fun CelebrationLayer(c: Celebration, onFinished: () -> Unit) {
 
     // Pure drawing, no touch handling.
     Canvas(Modifier.fillMaxSize()) {
-        drawCelebration(c, particles, burst.value, fox.value)
+        val a = anchorNow() ?: return@Canvas
+        drawCelebration(c, a, particles, burst.value, fox.value)
     }
 
     val cardShown by remember { derivedStateOf { card.value > 0.01f } }
     if (cardShown) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
-            FoundCard(c, appear = { card.value }, onClick = { cardVisible = false })
+            FoundCard(
+                c,
+                appear = { card.value },
+                onBounds = { bounds -> touches.card = bounds.translate(-frame.origin) },
+            )
         }
+    } else {
+        SideEffect { touches.card = null }
     }
 }
 
-private fun DrawScope.drawCelebration(c: Celebration, particles: List<Particle>, t: Float, foxT: Float) {
+/** [a] — где сейчас точка на краю элемента (элемент мог уехать при прокрутке). */
+private fun DrawScope.drawCelebration(c: Celebration, a: Offset, particles: List<Particle>, t: Float, foxT: Float) {
     val s = c.sizePx
     val color = Color(c.creature.color)
     val poses = c.poses
     if (t < 1f) {
-        val burstCenter = c.anchor + c.edge.outward() * (if (poses != null) c.shape.out * 0.5f else 0.55f * s)
+        val burstCenter = a + c.edge.outward() * (if (poses != null) c.shape.out * 0.5f else 0.55f * s)
         val eased = 1f - (1f - t) * (1f - t) * (1f - t) // ease-out cubic
 
         // Ring
@@ -556,7 +633,7 @@ private fun DrawScope.drawCelebration(c: Celebration, particles: List<Particle>,
 
     // Лиса поверх звёздочек: «ой, нашли!», два прыжка, убегает.
     if (poses != null) {
-        drawFoxCelebration(c, poses, foxT)
+        drawFoxCelebration(c, a, poses, foxT)
         return
     }
     if (t >= 1f) return
@@ -571,7 +648,7 @@ private fun DrawScope.drawCelebration(c: Celebration, particles: List<Particle>,
     val fade = 1f - ((t - 0.5f) / 0.5f).coerceIn(0f, 1f)
     if (fade <= 0f) return
     withTransform({
-        translate(c.anchor.x, c.anchor.y)
+        translate(a.x, a.y)
         rotate(c.edge.rotationDegrees, pivot = Offset.Zero)
         translate(-s / 2f, -peekNow * s - lift)
         scale(zoom, zoom, pivot = Offset(s / 2f, s / 2f))
@@ -599,7 +676,7 @@ private fun DrawScope.drawCelebration(c: Celebration, particles: List<Particle>,
  * run — наклон 8° и рывок за ближайший край экрана с покачиванием.
  * Если какой-то позы нет, её место занимает соседняя.
  */
-private fun DrawScope.drawFoxCelebration(c: Celebration, poses: LoadedSprites, t: Float) {
+private fun DrawScope.drawFoxCelebration(c: Celebration, a: Offset, poses: LoadedSprites, t: Float) {
     if (t >= 1f) return
     val first = poses.found ?: poses.celebrate ?: poses.run ?: return
     val second = poses.celebrate ?: poses.found ?: poses.run ?: return
@@ -613,19 +690,22 @@ private fun DrawScope.drawFoxCelebration(c: Celebration, poses: LoadedSprites, t
     val margin = 8.dp.toPx()
 
     // Где лиса стоит: на верхнем крае элемента или рядом со стеной, из-за которой выглядывала.
-    val start = when (c.edge) {
-        Edge.TOP -> c.anchor
-        Edge.RIGHT -> Offset(c.anchor.x + c.shape.out * 0.55f, c.anchor.y + c.shape.after)
-        Edge.LEFT -> Offset(c.anchor.x - c.shape.out * 0.55f, c.anchor.y + c.shape.after)
-        Edge.BOTTOM -> Offset(c.anchor.x, c.anchor.y + c.shape.out)
+    fun standAt(p: Offset): Offset = when (c.edge) {
+        Edge.TOP -> p
+        Edge.RIGHT -> Offset(p.x + c.shape.out * 0.55f, p.y + c.shape.after)
+        Edge.LEFT -> Offset(p.x - c.shape.out * 0.55f, p.y + c.shape.after)
+        Edge.BOTTOM -> Offset(p.x, p.y + c.shape.out)
     }
-    // Целиком на экране, вместе с прыжком.
+    // В момент находки лиса целиком на экране, вместе с прыжком. Этот сдвиг считаем один раз
+    // по исходной точке, а дальше лиса едет вместе с элементом.
+    val start = standAt(c.anchor)
     val minX = widest / 2f + margin
     val minY = tallest + jump + margin
-    val ground = Offset(
+    val fitted = Offset(
         start.x.coerceIn(minX, max(minX, size.width - widest / 2f - margin)),
         start.y.coerceIn(minY, max(minY, size.height - margin)),
     )
+    val ground = standAt(a) + (fitted - start)
 
     val ms = t * FOX_TOTAL_MS
     val jumpsEnd = FOX_FOUND_MS + 2f * FOX_JUMP_MS
@@ -657,7 +737,7 @@ private fun DrawScope.drawFoxCelebration(c: Celebration, poses: LoadedSprites, t
         }
         else -> {
             val p = ((ms - jumpsEnd) / FOX_RUN_MS).coerceIn(0f, 1f)
-            val toLeft = ground.x < size.width / 2f
+            val toLeft = fitted.x < size.width / 2f
             val target = if (toLeft) -thirdSize.width else size.width + thirdSize.width
             val x = ground.x + (target - ground.x) * p * p
             val bob = abs(sin(p * 3f * PI.toFloat())) * 8.dp.toPx()
@@ -675,7 +755,7 @@ private fun easeOut(x: Float): Float {
 }
 
 @Composable
-private fun FoundCard(c: Celebration, appear: () -> Float, onClick: () -> Unit) {
+private fun FoundCard(c: Celebration, appear: () -> Float, onBounds: (Rect) -> Unit) {
     val shape = RoundedCornerShape(22.dp)
     val accent = Color(c.creature.color)
     Row(
@@ -691,13 +771,11 @@ private fun FoundCard(c: Celebration, appear: () -> Float, onClick: () -> Unit) 
                 scaleX = 0.94f + 0.06f * a
                 scaleY = 0.94f + 0.06f * a
             }
+            .onGloballyPositioned { onBounds(it.boundsInRoot()) }
             .shadow(elevation = 12.dp, shape = shape)
             .background(Color.White, shape)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClick = onClick,
-            )
+            // Касание по карточке ничего не делает и не проходит к экрану под ней.
+            .pointerInput(Unit) { detectTapGestures { } }
             .padding(14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
