@@ -19,7 +19,7 @@ import ru.hideandseek.nychka.ui.components.KidsTabBar
 import ru.hideandseek.nychka.ui.components.Tab
 import ru.hideandseek.nychka.ui.screens.ContentScreen
 import ru.hideandseek.nychka.ui.screens.MainScreen
-import ru.hideandseek.nychka.ui.screens.PlaceholderScreen
+import ru.hideandseek.nychka.ui.screens.PiggyScreen
 import ru.hideandseek.nychka.ui.screens.TasksScreen
 import ru.hideandseek.nychka.ui.theme.KidsColors
 
@@ -39,7 +39,7 @@ fun AppRoot(initialTab: Tab = Tab.Main, initialDebug: Boolean = false) {
                 Tab.Main -> MainScreen()
                 Tab.Tasks -> TasksScreen()
                 Tab.Content -> ContentScreen()
-                Tab.Piggy -> PlaceholderScreen(title = "Копилки")
+                Tab.Piggy -> PiggyScreen()
             }
             KidsTabBar(
                 selected = tab,

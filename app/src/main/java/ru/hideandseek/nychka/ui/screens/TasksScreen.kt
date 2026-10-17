@@ -45,6 +45,7 @@ import ru.hideandseek.nychka.hidespots.hideSpot
 import ru.hideandseek.nychka.ui.components.ArrowTile
 import ru.hideandseek.nychka.ui.components.GradientButton
 import ru.hideandseek.nychka.ui.components.KidsAvatar
+import ru.hideandseek.nychka.ui.components.PlusButton
 import ru.hideandseek.nychka.ui.components.SectionTitle
 import ru.hideandseek.nychka.ui.components.WideButton
 import ru.hideandseek.nychka.ui.components.kidsCard
@@ -90,24 +91,6 @@ fun TasksScreen(modifier: Modifier = Modifier) {
         Spacer(Modifier.height(46.dp))
         WhatToDo()
         Spacer(Modifier.navigationBarsPadding().height(124.dp))
-    }
-}
-
-@Composable
-private fun PlusButton(modifier: Modifier = Modifier) {
-    Box(
-        modifier = modifier
-            .size(56.dp)
-            .tappable(RoundedCornerShape(15.dp), pressedScale = 0.9f)
-            .background(KidsColors.Card),
-        contentAlignment = Alignment.Center,
-    ) {
-        Canvas(Modifier.size(22.dp)) {
-            val w = size.width
-            val stroke = 3.6.dp.toPx()
-            drawLine(Color(0xFF5CC84A), Offset(w / 2, 0f), Offset(w / 2, w), stroke, StrokeCap.Round)
-            drawLine(Color(0xFF5CC84A), Offset(0f, w / 2), Offset(w, w / 2), stroke, StrokeCap.Round)
-        }
     }
 }
 

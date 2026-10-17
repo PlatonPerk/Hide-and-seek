@@ -82,7 +82,8 @@ fun KidsTabBar(
             TabItem(
                 label = "Копилки", selected = selected == Tab.Piggy, spotId = "tab.piggy",
                 icon = R.drawable.tab_piggy, iconSize = Art.TabPiggy,
-                activeIcon = R.drawable.tab_piggy, activeIconSize = Art.TabPiggy,
+                activeIcon = R.drawable.tab_piggy_active, activeIconSize = Art.TabPiggyActive,
+                activeIconOffsetX = (-4).dp, activeIconOffsetY = (-9).dp,
                 onClick = { onSelect(Tab.Piggy) },
             )
             PawButton(onLongPress = onPawLongPress)

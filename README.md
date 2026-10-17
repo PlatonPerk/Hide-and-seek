@@ -8,7 +8,7 @@
 ## Что уже есть
 
 - Нативный Android-прототип на Kotlin + Jetpack Compose (тот же стек и версии, что в песочнице организаторов).
-- Вкладки «Главный», «Дела», «Контент», сверстанные по макетам Figma, и плавающий таб-бар с лапкой.
+- Вкладки «Главный», «Копилки», «Дела», «Контент», сверстанные по макетам Figma, и плавающий таб-бар с лапкой.
 - Слой мест для пряток. Элементы экранов размечены модификаторами `Modifier.hideSpot(id)` (сюда прятаться можно)
   и `Modifier.noHideZone(id)` (сюда нельзя: кнопки оплаты и переводов, баланс, операции, реклама).
   Координаты мест обновляются при скролле. Таб-бар помечен как `occluder`: места, уехавшие под него,
@@ -45,7 +45,7 @@
 app/src/main/java/ru/hideandseek/nychka/
   AppRoot.kt                 корень: вкладки, реестр мест, отладочный слой
   hidespots/HideSpots.kt     hideSpot / noHideZone, HideSpotRegistry, отладочный оверлей
-  ui/screens/                MainScreen, TasksScreen, ContentScreen
+  ui/screens/                MainScreen, PiggyScreen, TasksScreen, ContentScreen
   ui/components/             таб-бар, кнопки, иконки
   ui/theme/Theme.kt          цвета и типографика из макета
 app/src/main/res/drawable-hdpi/   иллюстрации, вырезанные из макета

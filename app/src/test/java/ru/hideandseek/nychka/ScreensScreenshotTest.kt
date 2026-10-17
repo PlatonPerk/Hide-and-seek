@@ -41,6 +41,9 @@ class ScreensScreenshotTest {
     fun content() = shoot("03_content", Tab.Content)
 
     @Test
+    fun piggy() = shoot("06_piggy", Tab.Piggy)
+
+    @Test
     fun mainSpots() = shoot("04_main_spots", Tab.Main, debug = true)
 
     @Test
@@ -57,4 +60,8 @@ class ScreensScreenshotTest {
     @Test
     @Config(qualifiers = "w360dp-h3400dp-xhdpi")
     fun contentFull() = shoot("13_content_full", Tab.Content)
+
+    @Test
+    @Config(qualifiers = "w360dp-h2600dp-xhdpi")
+    fun piggyFull() = shoot("14_piggy_full", Tab.Piggy)
 }

@@ -54,6 +54,25 @@ fun KidsAvatar(spotId: String, modifier: Modifier = Modifier) {
     )
 }
 
+/** Белая квадратная кнопка с зелёным «+» (шапка «Дел» и «Копилок»). */
+@Composable
+fun PlusButton(modifier: Modifier = Modifier, onClick: () -> Unit = {}) {
+    Box(
+        modifier = modifier
+            .size(56.dp)
+            .tappable(RoundedCornerShape(15.dp), pressedScale = 0.9f, onClick = onClick)
+            .background(KidsColors.Card),
+        contentAlignment = Alignment.Center,
+    ) {
+        Canvas(Modifier.size(22.dp)) {
+            val w = size.width
+            val stroke = 3.6.dp.toPx()
+            drawLine(Color(0xFF5CC84A), Offset(w / 2, 0f), Offset(w / 2, w), stroke, StrokeCap.Round)
+            drawLine(Color(0xFF5CC84A), Offset(0f, w / 2), Offset(w, w / 2), stroke, StrokeCap.Round)
+        }
+    }
+}
+
 @Composable
 fun SectionTitle(text: String, modifier: Modifier = Modifier, style: TextStyle = KidsType.Display) {
     Text(text = text.nb(), style = style, modifier = modifier)
