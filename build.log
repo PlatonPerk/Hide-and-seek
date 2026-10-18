@@ -1,0 +1,274 @@
+Starting a Gradle Daemon (subsequent builds will be faster)
+Calculating task graph as no cached configuration is available for tasks: :app:assembleDebug :app:assembleRelease
+
+> Configure project :app
+WARNING: The option setting 'android.r8.gradual.support=true' is experimental.
+The current default is 'false'.
+
+> Task :app:preBuild UP-TO-DATE
+> Task :hideandseek:preBuild UP-TO-DATE
+> Task :app:generateDebugAssets UP-TO-DATE
+> Task :hideandseek:generateDebugAssets UP-TO-DATE
+> Task :hideandseek:preDebugBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:mergeDebugNativeDebugMetadata NO-SOURCE
+> Task :hideandseek:generateDebugResources
+> Task :app:generateDebugResources
+> Task :hideandseek:javaPreCompileDebug
+> Task :hideandseek:processDebugNavigationResources
+> Task :app:javaPreCompileDebug
+> Task :hideandseek:packageDebugResources
+> Task :app:packageDebugResources
+> Task :hideandseek:mergeDebugAssets
+> Task :app:processDebugNavigationResources
+> Task :app:mergeDebugAssets
+> Task :app:compressDebugAssets
+> Task :app:checkDebugDuplicateClasses
+> Task :app:desugarDebugFileDependencies
+> Task :hideandseek:parseDebugLocalResources
+> Task :app:parseDebugLocalResources
+> Task :app:generateDebugRFile
+> Task :hideandseek:generateDebugRFile
+> Task :hideandseek:writeDebugAarMetadata
+> Task :app:checkDebugAarMetadata
+> Task :app:mapDebugSourceSetPaths
+> Task :app:compileDebugNavigationResources
+> Task :app:generateDebugGlobalSynthetics
+> Task :app:createDebugCompatibleScreenManifests
+> Task :app:extractDeepLinksDebug
+> Task :hideandseek:extractDeepLinksDebug
+> Task :hideandseek:processDebugManifest
+> Task :app:mergeDebugResources
+> Task :hideandseek:mapDebugSourceSetPaths
+> Task :hideandseek:compileDebugLibraryResources
+> Task :app:mergeDebugJniLibFolders
+> Task :hideandseek:mergeDebugJniLibFolders
+> Task :hideandseek:mergeDebugNativeLibs NO-SOURCE
+> Task :hideandseek:copyDebugJniLibsProjectOnly
+> Task :app:processDebugMainManifest
+> Task :app:mergeDebugNativeLibs
+
+> Task :app:stripDebugDebugSymbols
+Unable to strip the following libraries, packaging them as they are: libandroidx.graphics.path.so. Run with --info option to learn more.
+
+> Task :app:validateSigningDebug
+> Task :app:writeDebugAppMetadata
+> Task :app:processDebugManifest
+> Task :app:writeDebugSigningConfigVersions
+> Task :app:preReleaseBuild UP-TO-DATE
+> Task :app:mergeReleaseJniLibFolders
+> Task :hideandseek:preReleaseBuild UP-TO-DATE
+> Task :app:processDebugManifestForPackage
+> Task :hideandseek:mergeReleaseJniLibFolders
+> Task :hideandseek:mergeReleaseNativeLibs NO-SOURCE
+> Task :hideandseek:copyReleaseJniLibsProjectOnly
+> Task :app:mergeReleaseNativeLibs
+
+> Task :app:stripReleaseDebugSymbols
+Unable to strip the following libraries, packaging them as they are: libandroidx.graphics.path.so. Run with --info option to learn more.
+
+> Task :app:extractReleaseNativeSymbolTables
+> Task :app:mergeReleaseNativeDebugMetadata NO-SOURCE
+> Task :hideandseek:generateReleaseResources
+> Task :hideandseek:packageReleaseResources
+> Task :hideandseek:processReleaseNavigationResources
+> Task :app:processDebugResources
+> Task :hideandseek:parseReleaseLocalResources
+> Task :hideandseek:javaPreCompileRelease
+> Task :hideandseek:generateReleaseRFile
+> Task :app:checkReleaseDuplicateClasses
+> Task :app:generateReleaseResources
+> Task :app:packageReleaseResources
+> Task :app:processReleaseNavigationResources
+> Task :app:parseReleaseLocalResources
+> Task :app:generateReleaseRFile
+> Task :app:javaPreCompileRelease
+> Task :hideandseek:prepareReleaseArtProfile
+> Task :app:mergeExtDexDebug
+> Task :hideandseek:writeReleaseAarMetadata
+> Task :app:mergeReleaseArtProfile
+> Task :app:checkReleaseAarMetadata
+> Task :app:mapReleaseSourceSetPaths
+> Task :app:compileReleaseNavigationResources
+> Task :app:createReleaseCompatibleScreenManifests
+> Task :app:extractDeepLinksRelease
+> Task :hideandseek:extractDeepLinksRelease
+> Task :hideandseek:processReleaseManifest
+> Task :app:processReleaseMainManifest
+> Task :app:processReleaseManifest
+> Task :app:processReleaseManifestForPackage
+> Task :hideandseek:mapReleaseSourceSetPaths
+> Task :hideandseek:compileReleaseLibraryResources
+> Task :app:extractProguardFiles
+> Task :app:mergeReleaseStartupProfile
+> Task :app:generateReleaseAssets UP-TO-DATE
+> Task :hideandseek:generateReleaseAssets UP-TO-DATE
+> Task :hideandseek:mergeReleaseAssets
+> Task :app:mergeReleaseAssets
+> Task :app:compressReleaseAssets
+> Task :app:extractReleaseVersionControlInfo
+> Task :hideandseek:extractProguardFiles
+> Task :hideandseek:prepareLintJarForPublish
+> Task :hideandseek:checkReleaseAarMetadata
+> Task :hideandseek:stripReleaseDebugSymbols NO-SOURCE
+> Task :hideandseek:copyReleaseJniLibsProjectAndLocalJars
+> Task :hideandseek:extractDeepLinksForAarRelease
+> Task :hideandseek:extractReleaseAnnotations
+> Task :hideandseek:writeReleaseLintModelMetadata
+> Task :app:collectReleaseDependencies
+> Task :app:sdkReleaseDependencyData
+> Task :app:validateSigningRelease
+> Task :app:writeReleaseAppMetadata
+> Task :app:writeReleaseSigningConfigVersions
+> Task :app:mergeReleaseResources
+> Task :app:processReleaseResources
+> Task :hideandseek:compileReleaseKotlin
+> Task :hideandseek:compileReleaseJavaWithJavac NO-SOURCE
+> Task :hideandseek:compileDebugKotlin
+> Task :hideandseek:compileDebugJavaWithJavac NO-SOURCE
+> Task :hideandseek:mergeReleaseGeneratedProguardFiles
+> Task :hideandseek:processReleaseJavaRes
+> Task :hideandseek:processDebugJavaRes
+> Task :hideandseek:exportReleaseConsumerProguardFiles
+> Task :hideandseek:bundleLibRuntimeToDirDebug
+> Task :hideandseek:bundleLibRuntimeToJarRelease
+> Task :hideandseek:bundleLibCompileToJarRelease
+> Task :hideandseek:bundleLibCompileToJarDebug
+> Task :hideandseek:createFullJarRelease
+> Task :hideandseek:generateReleaseLintModel
+> Task :hideandseek:mergeReleaseConsumerProguardFiles
+> Task :hideandseek:mergeReleaseJavaResource
+> Task :hideandseek:syncReleaseLibJars
+> Task :hideandseek:bundleReleaseLocalLintAar
+> Task :app:mergeLibDexDebug
+> Task :hideandseek:generateReleaseLintVitalModel
+> Task :app:compileDebugKotlin
+> Task :app:compileDebugJavaWithJavac NO-SOURCE
+> Task :app:compileReleaseKotlin
+> Task :app:compileReleaseJavaWithJavac NO-SOURCE
+> Task :app:processDebugJavaRes
+> Task :app:expandReleaseArtProfileWildcards
+> Task :app:mergeReleaseGeneratedProguardFiles
+> Task :app:processReleaseJavaRes
+> Task :app:dexBuilderDebug
+> Task :app:mergeProjectDexDebug
+> Task :app:generateReleaseLintVitalReportModel
+> Task :app:mergeReleaseJavaResource
+> Task :app:mergeDebugJavaResource
+> Task :app:packageDebug
+> Task :app:assembleDebug
+> Task :app:createDebugApkListingFileRedirect
+> Task :hideandseek:lintVitalAnalyzeRelease
+> Task :app:minifyReleaseWithR8
+> Task :app:lintVitalAnalyzeRelease
+> Task :app:lintVitalReportRelease
+> Task :app:lintVitalRelease
+> Task :app:convertShrunkResourcesToBinaryRelease
+> Task :app:optimizeReleaseResources
+> Task :app:compileReleaseArtProfile
+> Task :app:packageRelease
+> Task :app:assembleRelease
+> Task :app:createReleaseApkListingFileRedirect
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run-1792314243904.json
+
+BUILD SUCCESSFUL in 2m 23s
+137 actionable tasks: 137 executed
+Configuration cache entry stored.
+Calculating task graph as no cached configuration is available for tasks: :hideandseek:testDebugUnitTest
+
+> Configure project :app
+WARNING: The option setting 'android.r8.gradual.support=true' is experimental.
+The current default is 'false'.
+
+> Task :hideandseek:preBuild UP-TO-DATE
+> Task :hideandseek:preDebugBuild UP-TO-DATE
+> Task :hideandseek:preDebugUnitTestBuild UP-TO-DATE
+> Task :hideandseek:javaPreCompileDebugUnitTest
+> Task :hideandseek:javaPreCompileDebug UP-TO-DATE
+> Task :hideandseek:generateDebugResources UP-TO-DATE
+> Task :hideandseek:processDebugNavigationResources UP-TO-DATE
+> Task :hideandseek:packageDebugResources UP-TO-DATE
+> Task :hideandseek:parseDebugLocalResources UP-TO-DATE
+> Task :hideandseek:generateDebugRFile UP-TO-DATE
+> Task :hideandseek:compileDebugKotlin UP-TO-DATE
+> Task :hideandseek:compileDebugJavaWithJavac NO-SOURCE
+> Task :hideandseek:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :hideandseek:processDebugJavaRes UP-TO-DATE
+> Task :hideandseek:bundleLibRuntimeToJarDebug
+> Task :hideandseek:generateDebugUnitTestStubRFile
+> Task :hideandseek:compileDebugUnitTestKotlin
+> Task :hideandseek:compileDebugUnitTestJavaWithJavac NO-SOURCE
+> Task :hideandseek:processDebugUnitTestJavaRes
+> Task :hideandseek:testDebugUnitTest
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run_2-1792314379609.json
+
+BUILD SUCCESSFUL in 6s
+15 actionable tasks: 6 executed, 9 up-to-date
+Configuration cache entry stored.
+Calculating task graph as no cached configuration is available for tasks: :app:recordRoborazziDebug
+
+> Configure project :app
+WARNING: The option setting 'android.r8.gradual.support=true' is experimental.
+The current default is 'false'.
+
+> Task :hideandseek:preBuild UP-TO-DATE
+> Task :hideandseek:preDebugBuild UP-TO-DATE
+> Task :app:preBuild UP-TO-DATE
+> Task :app:generateDebugAssets UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :hideandseek:generateDebugResources UP-TO-DATE
+> Task :hideandseek:processDebugNavigationResources UP-TO-DATE
+> Task :hideandseek:javaPreCompileDebug UP-TO-DATE
+> Task :app:generateDebugResources UP-TO-DATE
+> Task :app:javaPreCompileDebug UP-TO-DATE
+> Task :app:packageDebugResources UP-TO-DATE
+> Task :hideandseek:packageDebugResources UP-TO-DATE
+> Task :hideandseek:writeDebugAarMetadata UP-TO-DATE
+> Task :app:mapDebugSourceSetPaths UP-TO-DATE
+> Task :hideandseek:parseDebugLocalResources UP-TO-DATE
+> Task :hideandseek:generateDebugRFile UP-TO-DATE
+> Task :app:processDebugNavigationResources UP-TO-DATE
+> Task :app:parseDebugLocalResources UP-TO-DATE
+> Task :app:checkDebugAarMetadata UP-TO-DATE
+> Task :app:mergeDebugResources UP-TO-DATE
+> Task :app:compileDebugNavigationResources UP-TO-DATE
+> Task :app:generateDebugRFile UP-TO-DATE
+> Task :app:createDebugCompatibleScreenManifests UP-TO-DATE
+> Task :app:extractDeepLinksDebug UP-TO-DATE
+> Task :hideandseek:extractDeepLinksDebug UP-TO-DATE
+> Task :hideandseek:mapDebugSourceSetPaths UP-TO-DATE
+> Task :hideandseek:processDebugManifest UP-TO-DATE
+> Task :app:preDebugUnitTestBuild UP-TO-DATE
+> Task :hideandseek:compileDebugLibraryResources UP-TO-DATE
+> Task :hideandseek:generateDebugAssets UP-TO-DATE
+> Task :hideandseek:mergeDebugAssets UP-TO-DATE
+> Task :hideandseek:compileDebugKotlin UP-TO-DATE
+> Task :hideandseek:compileDebugJavaWithJavac NO-SOURCE
+> Task :app:javaPreCompileDebugUnitTest
+> Task :hideandseek:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :hideandseek:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :hideandseek:processDebugJavaRes UP-TO-DATE
+> Task :app:mergeDebugAssets UP-TO-DATE
+> Task :app:processDebugMainManifest UP-TO-DATE
+> Task :app:processDebugManifest UP-TO-DATE
+> Task :app:processDebugManifestForPackage UP-TO-DATE
+> Task :app:compileDebugKotlin UP-TO-DATE
+> Task :app:compileDebugJavaWithJavac NO-SOURCE
+> Task :app:processDebugJavaRes UP-TO-DATE
+> Task :app:processDebugResources UP-TO-DATE
+> Task :app:packageDebugUnitTestForUnitTest
+> Task :app:bundleDebugClassesToRuntimeJar
+> Task :app:bundleDebugClassesToCompileJar
+> Task :app:processDebugUnitTestManifest
+> Task :app:generateDebugUnitTestConfig
+> Task :app:compileDebugUnitTestKotlin
+> Task :app:compileDebugUnitTestJavaWithJavac NO-SOURCE
+> Task :app:processDebugUnitTestJavaRes
+> Task :app:testDebugUnitTest
+> Task :app:recordRoborazziDebug
+> Task :app:finalizeTestRoborazziDebug
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run_3-1792314386315.json
+
+BUILD SUCCESSFUL in 50s
+45 actionable tasks: 10 executed, 35 up-to-date
+Configuration cache entry stored.
