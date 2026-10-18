@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -21,6 +22,8 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.hideandseek.ContentSource
 import app.hideandseek.HideAndSeekController
 import app.hideandseek.HideAndSeekHost
+import app.hideandseek.TourStop
+import app.hideandseek.core.Edge
 import com.github.takahirom.roborazzi.captureRoboImage
 import org.json.JSONArray
 import org.json.JSONObject
@@ -108,8 +111,9 @@ class FoxScreenshotTest {
     private fun show(tab: Tab, spotId: String, edge: String, align: Double): HideAndSeekController =
         show(tab, contentWith(spotId, edge, align))
 
-    private fun show(tab: Tab, json: String): HideAndSeekController {
-        val controller = controllerFor(json)
+    private fun show(tab: Tab, json: String): HideAndSeekController = show(tab, controllerFor(json))
+
+    private fun show(tab: Tab, controller: HideAndSeekController): HideAndSeekController {
         compose.mainClock.autoAdvance = false
         compose.setContent {
             NychkaTheme {
@@ -269,6 +273,79 @@ class FoxScreenshotTest {
         swipeCardUp()
         advance(3_000)
         assertEquals("piggy.goal", controller.plan?.spot?.id)
+    }
+
+    /**
+     * Маршрут демо: баннер сверху → карта сбоку (на том же экране) → свинка в «Копилках».
+     * Серия растёт с каждой находкой, карточка говорит, что лиса прячется снова.
+     */
+    @Test
+    fun demoTourAlternatesTopAndSideAndStreakCountsFinds() {
+        val json = contentWith(
+            listOf(Spot("main.banner", align = 0.85), Spot("main.card", align = 0.75), Spot("piggy.pig", "left", 0.6)),
+        )
+        val controller = controllerFor(json).apply {
+            demoRehide = true
+            streakByFinds = true
+            demoTour = listOf(TourStop("main.banner"), TourStop("main.card", Edge.LEFT, 0.5f), TourStop("piggy.pig"))
+        }
+        show(Tab.Main, controller)
+        assertEquals("main.banner", controller.plan?.spot?.id)
+        assertTrue("лиса на баннере", foxShown())
+
+        find()
+        advance(500)
+        compose.onNodeWithText("спрячется снова", substring = true).assertExists()
+        swipeCardUp()
+        advance(3_000)
+        assertEquals("main.card", controller.plan?.spot?.id)
+        assertEquals(Edge.LEFT, controller.plan?.spot?.edge)
+        assertTrue("лиса сбоку у карты", foxShown())
+        capture("31_tour_card_side")
+
+        find()
+        advance(600)
+        compose.onNodeWithText("Ты нашёл меня 2 раза подряд!", substring = true).assertExists()
+        capture("32_streak_by_finds")
+        swipeCardUp()
+        advance(3_000)
+        assertEquals("piggy.pig", controller.plan?.spot?.id)
+        assertEquals(2, controller.progress.streak)
+        assertEquals(3 to 3, controller.tourPosition)
+    }
+
+    /** Настоящий маршрут из NychkaConfig на полном контенте: на каждой остановке лиса появляется, маршрут идёт по кругу. */
+    @Test
+    @Config(qualifiers = "w360dp-h3400dp-xhdpi")
+    fun demoTourEveryStopShowsTheFox() {
+        val json = bundledContent().apply { getJSONObject("look").put("appearDelayMs", 0) }.toString()
+        val controller = controllerFor(json).apply {
+            demoRehide = NychkaConfig.DEMO_REHIDE
+            demoTour = NychkaConfig.DEMO_TOUR
+            streakByFinds = NychkaConfig.STREAK_BY_FINDS
+        }
+        var tab by mutableStateOf(Tab.Main)
+        compose.mainClock.autoAdvance = false
+        compose.setContent {
+            NychkaTheme {
+                HideAndSeekHost(controller, Modifier.fillMaxSize()) {
+                    val current = tab
+                    key(current) { AppRoot(initialTab = current) }
+                }
+            }
+        }
+        val missing = mutableListOf<String>()
+        for (stop in NychkaConfig.DEMO_TOUR) {
+            advance(300)
+            assertEquals(stop.spotId, controller.plan?.spot?.id)
+            tab = tabOf(stop.spotId)
+            advance(2_500)
+            if (!foxShown()) missing += stop.spotId
+            compose.runOnIdle { controller.demoNextSpot() }
+        }
+        assertTrue("Лиса не появилась: $missing", missing.isEmpty())
+        advance(300)
+        assertEquals(NychkaConfig.DEMO_TOUR.first().spotId, controller.plan?.spot?.id)
     }
 
     private fun scrollFeedUp(times: Int = 1, from: Float = 0.8f, to: Float = 0.3f) {
