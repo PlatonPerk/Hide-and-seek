@@ -29,6 +29,7 @@ import app.hideandseek.core.ContentParser
 import app.hideandseek.core.DailyPlan
 import app.hideandseek.core.DailyPlanner
 import app.hideandseek.core.Day
+import app.hideandseek.core.Edge
 import app.hideandseek.core.HideAndSeekContent
 import app.hideandseek.core.Progress
 import app.hideandseek.core.SpotDef
@@ -55,15 +56,28 @@ import kotlin.random.Random
 /** The controller of the nearest [HideAndSeekHost], or null outside of one. */
 val LocalHideAndSeek = staticCompositionLocalOf<HideAndSeekController?> { null }
 
+/**
+ * [configure] выполняется один раз при создании контроллера, до загрузки прогресса и контента:
+ * здесь включают режим демо (`demoRehide`, `demoTour`, `streakByFinds`).
+ */
 @Composable
 fun rememberHideAndSeekController(
     contentUrl: String? = null,
     source: ContentSource? = contentUrl?.let { UrlContentSource(it) },
     bundledAsset: String? = HideAndSeekController.DEFAULT_BUNDLED_ASSET,
+    configure: HideAndSeekController.() -> Unit = {},
 ): HideAndSeekController {
     val context = LocalContext.current.applicationContext
-    return remember { HideAndSeekController(context, source, bundledAsset) }
+    return remember { HideAndSeekController(context, source, bundledAsset).apply(configure) }
 }
+
+/**
+ * Остановка маршрута для демо: место [spotId] (как в `hidingSpot("…")`).
+ * [edge] и [align] заменяют край и положение из контента — так один и тот же элемент можно показать
+ * и сверху, и сбоку. Если места нет в контенте, нужен [edge], иначе остановка пропускается.
+ */
+@Immutable
+data class TourStop(val spotId: String, val edge: Edge? = null, val align: Float? = null)
 
 /**
  * Wrap the app content once. Draws the creature in a layer above [content];
@@ -226,6 +240,22 @@ class HideAndSeekController(
      */
     var demoRehide: Boolean by mutableStateOf(false)
 
+    /**
+     * Режим демо: маршрут — места по порядку. Пока включён [demoRehide], персонаж прячется
+     * на первой остановке, а после каждой находки переходит на следующую (по кругу).
+     * Пустой маршрут — после находки случайное место на другом экране.
+     */
+    var demoTour: List<TourStop> by mutableStateOf(emptyList())
+
+    /** Номер текущей остановки маршрута (растёт с каждой находкой, берётся по модулю длины). */
+    private var tourStep: Int by mutableIntStateOf(0)
+
+    /**
+     * Серия считается находками: каждая находка продлевает её на 1, дни не важны.
+     * false — серия из дней подряд, как в настоящем приложении.
+     */
+    var streakByFinds: Boolean by mutableStateOf(false)
+
     /** Режим демо: место, куда персонаж перепрятался после последней находки (null — место дня). */
     private var demoSpot: SpotDef? by mutableStateOf(null)
 
@@ -248,13 +278,38 @@ class HideAndSeekController(
     internal val hour: Int get() = Day.hourAt(nowMillis, offsetMillis)
 
     private val planState = derivedStateOf {
-        val base = content?.let { DailyPlanner.plan(it, today) }
-        val moved = demoSpot
+        val current = content
+        val base = current?.let { DailyPlanner.plan(it, today) }
+        val moved = (if (demoRehide && current != null) tourSpot(current) else null) ?: demoSpot
         if (base != null && moved != null) base.copy(spot = moved, tip = demoTip ?: base.tip) else base
     }
 
     /** Who hides today and where; null when nobody hides today. */
     val plan: DailyPlan? get() = planState.value
+
+    /** Остановки маршрута, которые есть в контенте (или заданы с краем), с заменой края и положения. */
+    private fun tourSpots(current: HideAndSeekContent): List<SpotDef> = demoTour.mapNotNull { stop ->
+        val known = current.spot(stop.spotId)
+        when {
+            known != null -> known.copy(edge = stop.edge ?: known.edge, align = stop.align ?: known.align)
+            stop.edge != null -> SpotDef(stop.spotId, stop.edge, stop.align ?: 0.5f)
+            else -> null
+        }
+    }
+
+    private fun tourSpot(current: HideAndSeekContent): SpotDef? {
+        val spots = tourSpots(current)
+        return if (spots.isEmpty()) null else spots[tourStep.mod(spots.size)]
+    }
+
+    /** Для панели демо: номер текущей остановки маршрута (с 1) и их число; null — маршрута нет. */
+    val tourPosition: Pair<Int, Int>?
+        get() {
+            val current = content ?: return null
+            if (!demoRehide) return null
+            val count = tourSpots(current).size
+            return if (count == 0) null else (tourStep.mod(count) + 1) to count
+        }
 
     val isFoundToday: Boolean get() = progress.isFound(today)
 
@@ -271,7 +326,8 @@ class HideAndSeekController(
             val bundled = if (cached == null) readBundled()?.let { parseOrNull(it) } else null
             Triple(saved, cached, bundled)
         }
-        progress = local.first
+        // Режим демо: находка из прошлого запуска не прячет персонажа — он сразу снова на месте.
+        progress = if (demoRehide) local.first.copy(lastFoundDay = null) else local.first
         if (content == null) {
             val cached = local.second
             val bundled = local.third
@@ -319,31 +375,56 @@ class HideAndSeekController(
     internal fun markFound(plan: DailyPlan) {
         val current = content ?: return
         if (progress.isFound(plan.day)) return
-        progress = progress.found(plan.day, plan.creature.id, DailyPlanner.previousHidingDay(current, plan.day))
+        progress = if (streakByFinds) {
+            progress.foundAgain(plan.day, plan.creature.id)
+        } else {
+            progress.found(plan.day, plan.creature.id, DailyPlanner.previousHidingDay(current, plan.day))
+        }
         store.save(progress)
         onFound?.invoke(plan)
     }
 
     /**
      * Вызывается слоем, когда карточка «Нашёл!» закрылась. В режиме демо персонаж
-     * перепрятывается на другом экране, чтобы искать его по всему приложению.
+     * перепрятывается: на следующую остановку [demoTour], а без маршрута — на другой экран,
+     * чтобы искать его по всему приложению.
      * Экран — часть id места до точки (`main`, `piggy`, `tasks`, `content`).
      * Если других экранов в контенте нет — в любое другое место.
      */
     internal fun afterFound() {
         if (!demoRehide) return
-        val current = content ?: return
         val now = plan ?: return
         if (!progress.isFound(now.day)) return
-        val others = current.spotsOn(now.day).filter { it.id != now.spot.id }
-        if (others.isEmpty()) return
-        val screen = screenOf(now.spot.id)
-        val pool = others.filter { screenOf(it.id) != screen }.ifEmpty { others }
-        demoSpot = pickWeighted(pool)
+        moveOn(now)
+    }
+
+    /**
+     * Режим демо, панель демо: перейти к следующему месту без находки
+     * (следующая остановка маршрута или случайное место на другом экране).
+     */
+    fun demoNextSpot() {
+        if (!demoRehide) return
+        val now = plan ?: return
+        moveOn(now)
+    }
+
+    private fun moveOn(now: DailyPlan) {
+        val current = content ?: return
+        if (tourSpots(current).isNotEmpty()) {
+            tourStep += 1
+        } else {
+            val others = current.spotsOn(now.day).filter { it.id != now.spot.id }
+            if (others.isEmpty()) return
+            val screen = screenOf(now.spot.id)
+            val pool = others.filter { screenOf(it.id) != screen }.ifEmpty { others }
+            demoSpot = pickWeighted(pool)
+        }
         val tips = current.tipsOn(now.day).map { it.text }.filter { it != now.tip }
         demoTip = if (tips.isEmpty()) now.tip else tips[demoRandom.nextInt(tips.size)]
-        progress = progress.copy(lastFoundDay = null)
-        store.save(progress)
+        if (progress.lastFoundDay != null) {
+            progress = progress.copy(lastFoundDay = null)
+            store.save(progress)
+        }
     }
 
     private fun screenOf(spotId: String): String = spotId.substringBefore('.')

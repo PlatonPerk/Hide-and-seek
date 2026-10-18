@@ -319,6 +319,47 @@ class CoreTest {
         assertEquals("12 дней", TextTemplate.ruDays(12))
         assertEquals("21 день", TextTemplate.ruDays(21))
         assertEquals("Hi Рыжик, 2", TextTemplate.fill("Hi {name}, {n}", mapOf("name" to "Рыжик", "n" to "2")))
+        assertEquals("1 раз", TextTemplate.ruTimes(1))
+        assertEquals("2 раза", TextTemplate.ruTimes(2))
+        assertEquals("4 раза", TextTemplate.ruTimes(4))
+        assertEquals("5 раз", TextTemplate.ruTimes(5))
+        assertEquals("12 раз", TextTemplate.ruTimes(12))
+        assertEquals("21 раз", TextTemplate.ruTimes(21))
+        assertEquals("22 раза", TextTemplate.ruTimes(22))
+        assertEquals("112 раз", TextTemplate.ruTimes(112))
+    }
+
+    /** Серия по находкам: каждая находка +1, в один день и через пропущенные дни тоже. */
+    @Test
+    fun streakCountsFinds() {
+        val day = Day.parse("2026-10-18")!!
+        var p = Progress()
+        p = p.foundAgain(day, "a")
+        assertEquals(1, p.streak)
+        p = p.foundAgain(day, "a") // тот же день без перепрятки — не считается дважды
+        assertEquals(1, p.streak)
+        p = p.copy(lastFoundDay = null) // перепрятка: снова можно найти сегодня
+        p = p.foundAgain(day, "b")
+        p = p.copy(lastFoundDay = null)
+        p = p.foundAgain(day, "a")
+        assertEquals(3, p.streak)
+        p = p.foundAgain(day + 10, "a") // пропуск дней серию не сбрасывает
+        assertEquals(4, p.streak)
+        assertEquals(4, p.totalFound)
+        assertEquals(setOf("a", "b"), p.collection)
+        assertTrue(p.isFound(day + 10))
+    }
+
+    @Test
+    fun demoTextsHaveDefaultsAndCanBeOverridden() {
+        assertTrue(content.texts.foundBodyRehide.contains("{name}"))
+        assertTrue(content.texts.streakFinds.contains("{streakTimes}"))
+        val custom = ContentParser.parse(
+            """{ "texts": { "foundBodyRehide": "Снова прячусь", "streakFinds": "Уже {streakTimes}!" } }""",
+        )
+        assertEquals("Снова прячусь", custom.texts.foundBodyRehide)
+        assertEquals("Уже 3 раза!", TextTemplate.fill(custom.texts.streakFinds, mapOf("streakTimes" to TextTemplate.ruTimes(3))))
+        assertEquals(Texts().streak, custom.texts.streak)
     }
 
     private fun contentJsonCopy(): String =

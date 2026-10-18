@@ -150,11 +150,15 @@ data class Look(
     val messageMs: Long = 5000L,
 )
 
-/** Texts support {name}, {streak}, {streakDays}, {total}. */
+/** Texts support {name}, {streak}, {streakDays}, {streakTimes}, {total}. */
 data class Texts(
     val foundTitle: String = "Нашёл!",
     val foundBody: String = "{name} прятался именно здесь. Завтра спрячется в другом месте.",
+    /** Текст карточки в режиме демо «Перепрятка»: персонаж сразу прячется снова, а не завтра. */
+    val foundBodyRehide: String = "Вот где было укрытие! Сейчас {name} спрячется снова — попробуй найти.",
     val streak: String = "Ты находишь меня {streakDays} подряд!",
+    /** Строка серии, когда она считается находками, а не днями. */
+    val streakFinds: String = "Ты нашёл меня {streakTimes} подряд!",
     val tipTitle: String = "Совет дня",
     val accessibilityLabel: String = "Здесь кто-то прячется. Нажми, чтобы найти",
 )
@@ -232,7 +236,9 @@ object ContentParser {
             texts = Texts(
                 foundTitle = texts.string("foundTitle") ?: defaultTexts.foundTitle,
                 foundBody = texts.string("foundBody") ?: defaultTexts.foundBody,
+                foundBodyRehide = texts.string("foundBodyRehide") ?: defaultTexts.foundBodyRehide,
                 streak = texts.string("streak") ?: defaultTexts.streak,
+                streakFinds = texts.string("streakFinds") ?: defaultTexts.streakFinds,
                 tipTitle = texts.string("tipTitle") ?: defaultTexts.tipTitle,
                 accessibilityLabel = texts.string("accessibilityLabel") ?: defaultTexts.accessibilityLabel,
             ),
@@ -363,6 +369,14 @@ object TextTemplate {
             mod10 in 2..4 -> "дня"
             else -> "дней"
         }
+        return "$n $word"
+    }
+
+    /** 1 раз, 2 раза, 5 раз. */
+    fun ruTimes(n: Int): String {
+        val mod100 = n % 100
+        val mod10 = n % 10
+        val word = if (mod100 !in 12..14 && mod10 in 2..4) "раза" else "раз"
         return "$n $word"
     }
 }

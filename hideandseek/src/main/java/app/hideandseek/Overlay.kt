@@ -460,9 +460,13 @@ private fun celebrationFor(
         "name" to plan.creature.name,
         "streak" to progress.streak.toString(),
         "streakDays" to TextTemplate.ruDays(progress.streak),
+        "streakTimes" to TextTemplate.ruTimes(progress.streak),
         "total" to progress.totalFound.toString(),
     )
     val texts = content.texts
+    // Режим демо: персонаж прячется снова сразу, а серия может считаться находками, а не днями.
+    val body = if (controller.demoRehide) texts.foundBodyRehide else texts.foundBody
+    val streak = if (controller.streakByFinds) texts.streakFinds else texts.streak
     return Celebration(
         id = System.nanoTime(),
         creature = plan.creature,
@@ -478,8 +482,8 @@ private fun celebrationFor(
         shape = shape,
         cardImage = poses?.celebrate?.image ?: poses?.found?.image ?: sprite,
         title = TextTemplate.fill(texts.foundTitle, values),
-        body = TextTemplate.fill(texts.foundBody, values),
-        streakLine = if (progress.streak >= 2) TextTemplate.fill(texts.streak, values) else null,
+        body = TextTemplate.fill(body, values),
+        streakLine = if (progress.streak >= 2) TextTemplate.fill(streak, values) else null,
         tipTitle = texts.tipTitle,
         tip = plan.tip,
         messageMs = content.look.messageMs,

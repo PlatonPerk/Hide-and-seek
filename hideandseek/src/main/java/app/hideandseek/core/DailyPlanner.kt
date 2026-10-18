@@ -99,4 +99,15 @@ data class Progress(
             collection = collection + creatureId,
         )
     }
+
+    /** Серия по находкам (режим демо): каждая находка продлевает серию на 1, дни не важны. */
+    fun foundAgain(day: Day, creatureId: String): Progress {
+        if (lastFoundDay == day) return this
+        return Progress(
+            lastFoundDay = day,
+            streak = streak + 1,
+            totalFound = totalFound + 1,
+            collection = collection + creatureId,
+        )
+    }
 }

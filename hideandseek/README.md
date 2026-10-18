@@ -58,6 +58,8 @@ fun TransferScreen() {
 - В продакшене контент берётся по ключу CMS: `rememberHideAndSeekController(source = ContentSource { cms.getJson("kids_hide_and_seek") })`.
 - Если JSON не задан или не скачался, используется кеш, а при первом запуске — копия из `assets/hideandseek/content.json`.
 - Аналитика: `hideAndSeek.onFound = { plan -> analytics.log("hide_seek_found", plan.creature.id) }`.
+- Режим демо (только для показа): `rememberHideAndSeekController(...) { demoRehide = true; demoTour = listOf(TourStop("home.balance"), TourStop("home.card", Edge.LEFT)); streakByFinds = true }` —
+  после каждой находки зверёк сразу прячется на следующем месте маршрута, а серия считается находками, а не днями.
 
 ## Сайт-имитация
 
@@ -104,7 +106,7 @@ fun TransferScreen() {
 | `spots[]` | `id`, `edge` (top / bottom / left / right), `align` (0..1 вдоль края), `weight`, `web` (селектор для сайта), `from`/`to` |
 | `tips[]` | советы про деньги: строка или `{ "text", "from", "to" }` |
 | `specialDays[]` | `date` и `creature` / `spot` / `tip` — праздники и демо; `"skip": true` — выходной |
-| `texts` | тексты карточки; подстановки `{name}`, `{streak}`, `{streakDays}`, `{total}` |
+| `texts` | тексты карточки; подстановки `{name}`, `{streak}`, `{streakDays}`, `{streakTimes}`, `{total}`; для режима демо — `foundBodyRehide`, `streakFinds` |
 
 ## Почему это не мешает сценариям (для защиты)
 
