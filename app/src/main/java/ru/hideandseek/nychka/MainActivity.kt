@@ -7,9 +7,10 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import app.hideandseek.HideAndSeekHost
+import app.hideandseek.TourStop
+import app.hideandseek.core.Edge
 import app.hideandseek.rememberHideAndSeekController
 import ru.hideandseek.nychka.ui.theme.NychkaTheme
 
@@ -28,6 +29,24 @@ object NychkaConfig {
      * (а не ждёт завтра). Переключается и в панели демо. В настоящем приложении — false.
      */
     const val DEMO_REHIDE = true
+
+    /**
+     * Маршрут Нычки в режиме демо: после каждой находки — следующее место (по кругу).
+     * Сверху и сбоку по очереди, на каждой вкладке. Край и положение по умолчанию — из контента;
+     * у карты на «Главном» край заменён на левый, чтобы боковую позу было видно на первом же экране.
+     */
+    val DEMO_TOUR = listOf(
+        TourStop("main.banner"),                      // «Главный», сверху
+        TourStop("main.card", Edge.LEFT, 0.5f),       // «Главный», сбоку
+        TourStop("piggy.pig"),                        // «Копилки», сбоку
+        TourStop("piggy.goal"),                       // «Копилки», сверху
+        TourStop("tasks.start_card"),                 // «Дела», сверху
+        TourStop("content.hero"),                     // «Контент», сверху
+        TourStop("content.algoritmika_mascot"),       // «Контент», сбоку (прокрутить вниз)
+    )
+
+    /** Серия считается находками (каждая находка +1), а не днями подряд. В настоящем приложении — false. */
+    const val STREAK_BY_FINDS = true
 }
 
 class MainActivity : ComponentActivity() {
@@ -41,8 +60,11 @@ class MainActivity : ComponentActivity() {
             NychkaTheme {
                 // Один контроллер на всё приложение и один слой поверх всех экранов:
                 // это и есть встраивание модуля «Прятки».
-                val hideAndSeek = rememberHideAndSeekController(contentUrl = NychkaConfig.CONTENT_URL)
-                LaunchedEffect(hideAndSeek) { hideAndSeek.demoRehide = NychkaConfig.DEMO_REHIDE }
+                val hideAndSeek = rememberHideAndSeekController(contentUrl = NychkaConfig.CONTENT_URL) {
+                    demoRehide = NychkaConfig.DEMO_REHIDE
+                    demoTour = NychkaConfig.DEMO_TOUR
+                    streakByFinds = NychkaConfig.STREAK_BY_FINDS
+                }
                 HideAndSeekHost(hideAndSeek, Modifier.fillMaxSize()) {
                     AppRoot()
                 }

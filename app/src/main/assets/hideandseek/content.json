@@ -1,5 +1,5 @@
 {
-  "version": 4,
+  "version": 5,
   "enabled": true,
   "timeZone": "Europe/Moscow",
   "salt": "nychka-2026",
@@ -80,7 +80,9 @@
   "texts": {
     "foundTitle": "Нашёл!",
     "foundBody": "Вот где было укрытие! Завтра {name} спрячется в другом месте.",
+    "foundBodyRehide": "Вот где было укрытие! Сейчас {name} спрячется снова — попробуй найти.",
     "streak": "Ты находишь меня {streakDays} подряд!",
+    "streakFinds": "Ты нашёл меня {streakTimes} подряд!",
     "tipTitle": "Совет дня",
     "accessibilityLabel": "Здесь кто-то прячется. Нажми, чтобы найти"
   }

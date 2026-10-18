@@ -24,6 +24,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.hideandseek.HideAndSeekController
+import app.hideandseek.core.Edge
 import kotlinx.coroutines.launch
 
 /**
@@ -73,11 +74,18 @@ fun DevPanel(hideAndSeek: HideAndSeekController, onClose: () -> Unit, modifier: 
         )
         DevLine(
             "Прячется",
-            plan?.let { "${it.creature.name} → ${screenName(it.spot.id)} (${it.spot.id})" } ?: "сегодня никто не прячется",
+            plan?.let { "${it.creature.name} → ${screenName(it.spot.id)}, ${edgeName(it.spot.edge)} (${it.spot.id})" }
+                ?: "сегодня никто не прячется",
         )
+        hideAndSeek.tourPosition?.let { (step, count) -> DevLine("Маршрут", "место $step из $count") }
         DevLine("Найден", if (hideAndSeek.isFoundToday) "да" else "нет")
         DevLine("Контент", content?.let { "v${it.version}, ${hideAndSeek.contentOrigin}" } ?: "загружается…")
-        DevLine("Находок", "${progress.totalFound}, серия ${progress.streak}, коллекция ${progress.collection.size}")
+        DevLine(
+            "Находок",
+            "${progress.totalFound}, серия ${progress.streak} " +
+                (if (hideAndSeek.streakByFinds) "(по находкам)" else "(по дням)") +
+                ", коллекция ${progress.collection.size}",
+        )
         hideAndSeek.lastError?.let { DevLine("Ошибка", it) }
         Spacer(Modifier.height(10.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -99,7 +107,18 @@ fun DevPanel(hideAndSeek: HideAndSeekController, onClose: () -> Unit, modifier: 
             ) { hideAndSeek.demoRehide = !hideAndSeek.demoRehide }
             DevButton("Сбросить находки", Modifier.weight(1f)) { hideAndSeek.resetAll() }
         }
+        if (hideAndSeek.demoRehide) {
+            Spacer(Modifier.height(8.dp))
+            DevButton("Следующее место ▶", Modifier.fillMaxWidth()) { hideAndSeek.demoNextSpot() }
+        }
     }
+}
+
+private fun edgeName(edge: Edge): String = when (edge) {
+    Edge.TOP -> "сверху"
+    Edge.BOTTOM -> "снизу"
+    Edge.LEFT -> "сбоку слева"
+    Edge.RIGHT -> "сбоку справа"
 }
 
 /** Вкладка по началу id места (main.banner → «Главный»). */
